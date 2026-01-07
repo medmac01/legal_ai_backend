@@ -860,19 +860,40 @@ async def delete_conversation(
 
 class NDAGenerateRequest(BaseModel):
     """
-    Request model for NDA generation.
+    Request model for NDA generation using Jinja2 templates.
     """
-    client_name: str
-    client_type_and_address: str
-    counterparty_name: str
-    counterparty_type_and_address: str
-    party_role: str  # "Receiving Party", "Disclosing Party", or "Both (Bilateral)"
+    # First Party (Client) Information
+    first_party: str
+    first_party_address: str
+    first_party_incorporation_state: str
+    first_party_representative: str
+    first_party_registration_number: str
+    first_party_role: str  # "Receiving Party", "Disclosing Party", or "Both (Bilateral)"
+    
+    # Second Party (Counterparty) Information
+    second_party: str
+    second_party_address: str
+    second_party_incorporation_state: str
+    second_party_representative: str
+    second_party_registration_number: str
+    
+    # Agreement Details
     purpose: str
     applicable_law: str
     language: str
     duration: int  # Duration in months
     litigation: str
-    effective_date: Optional[str] = None
+    date: Optional[str] = None  # Effective date in ISO format (defaults to today)
+
+
+class NDAModifyRequest(BaseModel):
+    """
+    Request model for NDA modification using AI.
+    """
+    nda_text: str  # The current NDA text to modify
+    modification_request: str  # User's request for how to modify the NDA
+    conversation_history: Optional[List[Dict[str, Any]]] = None  # Optional conversation history
+
 
 @app.post("/nda/generate", tags=["NDA Generator"])
 async def generate_nda(
@@ -880,89 +901,100 @@ async def generate_nda(
     user: Optional[SupabaseUser] = Depends(get_current_user)
 ):
     """
-    **Generate a Non-Disclosure Agreement**
+    **Generate a Non-Disclosure Agreement using Jinja2 Templates**
 
-    This endpoint generates an NDA document based on the provided parameters using AI.
-    The generated NDA text is returned in the response.
+    This endpoint generates an NDA document based on the provided parameters using Jinja2 templates.
+    The generated NDA text is returned in the response. No AI API key is required for generation.
 
     **Authentication:**
     - Requires a valid Supabase JWT token in the Authorization header (if authentication is enabled)
     - Format: `Authorization: Bearer <token>`
 
     **Request Parameters:**
-    - `client_name`: Client company name (Party 1)
-    - `client_type_and_address`: Client type and address
-    - `counterparty_name`: Counterparty name (Party 2)
-    - `counterparty_type_and_address`: Counterparty type and address
-    - `party_role`: Which party is the client ("Receiving Party", "Disclosing Party", "Both (Bilateral)")
+    - `first_party`: First party company name
+    - `first_party_address`: Address of the first party
+    - `first_party_incorporation_state`: Incorporation state of the first party
+    - `first_party_representative`: Representative of the first party
+    - `first_party_registration_number`: Registration number of the first party
+    - `first_party_role`: Role of first party ("Receiving Party", "Disclosing Party", "Both (Bilateral)")
+    - `second_party`: Second party company name
+    - `second_party_address`: Address of the second party
+    - `second_party_incorporation_state`: Incorporation state of the second party
+    - `second_party_representative`: Representative of the second party
+    - `second_party_registration_number`: Registration number of the second party
     - `purpose`: Purpose of disclosure
     - `applicable_law`: Governing law (e.g., "English Law", "French Law", "Moroccan Law")
     - `language`: Language of the contract (e.g., "English", "French")
     - `duration`: Duration of confidentiality in months
     - `litigation`: Dispute resolution mechanism
-    - `effective_date`: Optional effective date (ISO format, defaults to today)
+    - `date`: Optional effective date (ISO format, defaults to today)
 
     **Response:**
-    - Returns the generated NDA text and the prompt used.
+    - Returns the generated NDA text.
 
     **Example Request:**
     ```json
     {
-        "client_name": "OCP",
-        "client_type_and_address": "Public Company, Casablanca, Morocco",
-        "counterparty_name": "Tech Solutions Inc.",
-        "counterparty_type_and_address": "Private Company, Paris, France",
-        "party_role": "Receiving Party",
-        "purpose": "To evaluate a potential business partnership",
-        "applicable_law": "English Law",
+        "first_party": "OCP",
+        "first_party_address": "Rue Al Abtal, Hay Erraha 20200, Casablanca Morocco",
+        "first_party_incorporation_state": "Casablanca, Morocco",
+        "first_party_representative": "Mr. Last First",
+        "first_party_registration_number": "40327",
+        "first_party_role": "Disclosing Party",
+        "second_party": "UM6P Foundry",
+        "second_party_address": "Lot 660, Hay Moulay Rachid Ben Guerir, 43150, Morocco",
+        "second_party_incorporation_state": "Ben Guerir, Morocco",
+        "second_party_representative": "Mr. Last First",
+        "second_party_registration_number": "1037",
+        "purpose": "The contemplated cooperation between the Parties relating to the impact of AI on the future of work",
+        "applicable_law": "Moroccan Law",
         "language": "English",
         "duration": 36,
         "litigation": "Arbitration under ICC Rules, seat in Paris",
-        "effective_date": "2025-01-07"
+        "date": "2025-01-07"
     }
     ```
     """
     user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
-    logger.info(f"NDA generation request - User: {user_info}, Client: {request.client_name}, Counterparty: {request.counterparty_name}")
+    logger.info(f"NDA generation request - User: {user_info}, First Party: {request.first_party}, Second Party: {request.second_party}")
     
     try:
-        from .nda_generator import NDAService, build_llm_prompt
+        from .nda_generator import NDAService
         
         # Prepare user inputs
         user_inputs = {
-            "client_name": request.client_name,
-            "client_type_and_address": request.client_type_and_address,
-            "counterparty_name": request.counterparty_name,
-            "counterparty_type_and_address": request.counterparty_type_and_address,
-            "party_role": request.party_role,
+            "first_party": request.first_party,
+            "first_party_address": request.first_party_address,
+            "first_party_incorporation_state": request.first_party_incorporation_state,
+            "first_party_representative": request.first_party_representative,
+            "first_party_registration_number": request.first_party_registration_number,
+            "first_party_role": request.first_party_role,
+            "second_party": request.second_party,
+            "second_party_address": request.second_party_address,
+            "second_party_incorporation_state": request.second_party_incorporation_state,
+            "second_party_representative": request.second_party_representative,
+            "second_party_registration_number": request.second_party_registration_number,
             "purpose": request.purpose,
             "applicable_law": request.applicable_law,
             "language": request.language,
             "duration": request.duration,
             "litigation": request.litigation,
-            "effective_date": request.effective_date,
+            "date": request.date,
         }
         
         # Initialize NDA service and generate
         nda_service = NDAService()
         nda_text = nda_service.generate_nda_text(user_inputs)
         
-        # Build prompt for reference (without making another API call)
-        user_inputs["nature_of_obligations"] = "Unilateral" if request.party_role != "Both (Bilateral)" else "Bilateral"
-        if not user_inputs.get("effective_date"):
-            user_inputs["effective_date"] = date.today().isoformat()
-        prompt = build_llm_prompt(user_inputs)
-        
-        logger.info(f"NDA generated successfully for client: {request.client_name}")
+        logger.info(f"NDA generated successfully for first_party: {request.first_party}")
         
         return create_response(
             "NDA generated successfully",
             200,
             {
                 "nda_text": nda_text,
-                "prompt": prompt,
-                "client_name": request.client_name,
-                "counterparty_name": request.counterparty_name
+                "first_party": request.first_party,
+                "second_party": request.second_party
             }
         )
     except ValueError as e:
@@ -980,8 +1012,8 @@ async def generate_nda_docx(
     """
     **Generate a Non-Disclosure Agreement as a Word Document**
 
-    This endpoint generates an NDA document based on the provided parameters using AI
-    and returns it as a downloadable Word document (.docx).
+    This endpoint generates an NDA document based on the provided parameters using Jinja2 templates
+    and returns it as a downloadable Word document (.docx). No AI API key is required.
 
     **Authentication:**
     - Requires a valid Supabase JWT token in the Authorization header (if authentication is enabled)
@@ -996,11 +1028,17 @@ async def generate_nda_docx(
     **Example Request:**
     ```json
     {
-        "client_name": "OCP",
-        "client_type_and_address": "Public Company, Casablanca, Morocco",
-        "counterparty_name": "Tech Solutions Inc.",
-        "counterparty_type_and_address": "Private Company, Paris, France",
-        "party_role": "Both (Bilateral)",
+        "first_party": "OCP",
+        "first_party_address": "Rue Al Abtal, Hay Erraha 20200, Casablanca Morocco",
+        "first_party_incorporation_state": "Casablanca, Morocco",
+        "first_party_representative": "Mr. Last First",
+        "first_party_registration_number": "40327",
+        "first_party_role": "Both (Bilateral)",
+        "second_party": "UM6P Foundry",
+        "second_party_address": "Lot 660, Hay Moulay Rachid Ben Guerir, 43150, Morocco",
+        "second_party_incorporation_state": "Ben Guerir, Morocco",
+        "second_party_representative": "Mr. Last First",
+        "second_party_registration_number": "1037",
         "purpose": "To evaluate a potential business partnership",
         "applicable_law": "French Law",
         "language": "French",
@@ -1010,7 +1048,7 @@ async def generate_nda_docx(
     ```
     """
     user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
-    logger.info(f"NDA DOCX generation request - User: {user_info}, Client: {request.client_name}, Counterparty: {request.counterparty_name}")
+    logger.info(f"NDA DOCX generation request - User: {user_info}, First Party: {request.first_party}, Second Party: {request.second_party}")
     
     try:
         from .nda_generator import NDAService
@@ -1018,17 +1056,23 @@ async def generate_nda_docx(
         
         # Prepare user inputs
         user_inputs = {
-            "client_name": request.client_name,
-            "client_type_and_address": request.client_type_and_address,
-            "counterparty_name": request.counterparty_name,
-            "counterparty_type_and_address": request.counterparty_type_and_address,
-            "party_role": request.party_role,
+            "first_party": request.first_party,
+            "first_party_address": request.first_party_address,
+            "first_party_incorporation_state": request.first_party_incorporation_state,
+            "first_party_representative": request.first_party_representative,
+            "first_party_registration_number": request.first_party_registration_number,
+            "first_party_role": request.first_party_role,
+            "second_party": request.second_party,
+            "second_party_address": request.second_party_address,
+            "second_party_incorporation_state": request.second_party_incorporation_state,
+            "second_party_representative": request.second_party_representative,
+            "second_party_registration_number": request.second_party_registration_number,
             "purpose": request.purpose,
             "applicable_law": request.applicable_law,
             "language": request.language,
             "duration": request.duration,
             "litigation": request.litigation,
-            "effective_date": request.effective_date,
+            "date": request.date,
         }
         
         # Initialize NDA service and generate
@@ -1036,9 +1080,9 @@ async def generate_nda_docx(
         nda_text, docx_bytes = nda_service.generate_nda_with_docx(user_inputs)
         
         # Create filename
-        client_clean = request.client_name.replace(" ", "")
-        counterparty_clean = request.counterparty_name.replace(" ", "")
-        filename = f"NDA_{client_clean}_{counterparty_clean}.docx"
+        first_party_clean = request.first_party.replace(" ", "")
+        second_party_clean = request.second_party.replace(" ", "")
+        filename = f"NDA_{first_party_clean}_{second_party_clean}.docx"
         
         logger.info(f"NDA DOCX generated successfully: {filename}")
         
@@ -1055,6 +1099,71 @@ async def generate_nda_docx(
     except Exception as e:
         logger.error(f"Error generating NDA DOCX: {str(e)}")
         return create_response("Failed to generate NDA document", 500, {"error": str(e)})
+
+
+@app.post("/nda/modify", tags=["NDA Generator"])
+async def modify_nda(
+    request: NDAModifyRequest,
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Modify an existing NDA using AI**
+
+    This endpoint modifies an existing NDA document based on the user's request using Google Gemini AI.
+    Requires GEMINI_API_KEY environment variable to be set.
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header (if authentication is enabled)
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Parameters:**
+    - `nda_text`: The current NDA text to modify
+    - `modification_request`: User's request for how to modify the NDA (e.g., "Change duration to 5 years")
+    - `conversation_history`: Optional list of previous conversation messages for context
+
+    **Response:**
+    - Returns the modified NDA text.
+
+    **Example Request:**
+    ```json
+    {
+        "nda_text": "NON-DISCLOSURE AGREEMENT...",
+        "modification_request": "Change the duration from 36 months to 60 months",
+        "conversation_history": []
+    }
+    ```
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"NDA modification request - User: {user_info}, Request: {request.modification_request[:100]}...")
+    
+    try:
+        from .nda_generator import NDAService
+        
+        # Initialize NDA service (requires GEMINI_API_KEY for modification)
+        nda_service = NDAService()
+        
+        # Modify the NDA
+        modified_text = nda_service.modify_nda(
+            nda_text=request.nda_text,
+            modification_request=request.modification_request,
+            conversation_history=request.conversation_history
+        )
+        
+        logger.info("NDA modified successfully")
+        
+        return create_response(
+            "NDA modified successfully",
+            200,
+            {
+                "nda_text": modified_text
+            }
+        )
+    except ValueError as e:
+        logger.error(f"Validation error in NDA modification: {str(e)}")
+        return create_response("Validation error", 400, {"error": str(e)})
+    except Exception as e:
+        logger.error(f"Error modifying NDA: {str(e)}")
+        return create_response("Failed to modify NDA", 500, {"error": str(e)})
 
 # ==================== End of NDA Generator Endpoints ====================
 

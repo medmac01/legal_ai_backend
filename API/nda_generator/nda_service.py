@@ -1,7 +1,8 @@
 """
 Description: 
-    NDA Generator Service for generating Non-Disclosure Agreements using Google Gemini API.
-    Provides functionality to generate NDA text and Word documents.
+    NDA Generator Service for generating Non-Disclosure Agreements.
+    Uses Jinja2 templates for initial NDA generation and Google Gemini API
+    for NDA modification/customization.
     
 Author: Adapted from Streamlit app for FastAPI
 Date  : 2025/01/07
@@ -11,20 +12,35 @@ import os
 import logging
 from datetime import date
 from io import BytesIO
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 
 import google.generativeai as genai
 from docx import Document
 
-from .rules_engine import build_llm_prompt
+from .j2_engine import render_template
 
 # Get a logger instance - use a local logger to avoid circular imports
 logger = logging.getLogger(__name__)
 
+# System prompt for the chat/modification phase
+CHAT_SYSTEM_PROMPT = """
+You are a precise legal contract editor. Your task is to modify the provided Non-Disclosure Agreement (NDA) based *only* on the user's explicit request.
+
+**Your Core Directives:**
+1.  **Strict Adherence:** Only make the change requested by the user. Do not add, remove, or alter any other part of the contract.
+2.  **Maintain Professional Tone:** Ensure the wording of your modifications is formal, professional, and consistent with the existing legal language of the document.
+3.  **Output the Full Document:** After making the requested change, you MUST return the entire, complete, and updated text of the NDA. Do not provide summaries, explanations, or confirmation messages. Your output should be only the contract text itself.
+4.  **No Commentary:** Do not include phrases like "Here is the updated version:", "I have made the requested change:", or any other conversational text. The output must be ready to be copied and pasted directly into a legal document.
+5.  **If Unclear, Ask:** If the user's request is ambiguous, ask for clarification instead of guessing. For example: "Could you please specify which clause you are referring to for the 'indemnity' change?"
+
+Your role is to act as a silent, precise editing tool. The user provides an instruction, you provide the fully updated document.
+"""
+
 
 class NDAService:
     """
-    Service class for generating Non-Disclosure Agreements using Google Gemini API.
+    Service class for generating Non-Disclosure Agreements.
+    Uses Jinja2 templates for initial generation and Google Gemini API for modifications.
     """
     
     def __init__(self, api_key: Optional[str] = None):
@@ -33,46 +49,60 @@ class NDAService:
         
         Args:
             api_key: Optional Gemini API key. If not provided, will try to get from environment.
+                     API key is only required for modification features, not for template-based generation.
         """
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is required. Set it as an environment variable or pass it to the constructor.")
+        self.model = None
         
-        # Configure the Gemini API
-        genai.configure(api_key=self.api_key)
-        
-        # Set up the model generation configuration
-        self.generation_config = {
-            "temperature": 0.3,
-            "top_p": 1,
-            "top_k": 1,
-            "max_output_tokens": 8192,
-        }
-        
-        # Initialize the Generative Model
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-lite-preview-06-17",
-            generation_config=self.generation_config
-        )
-        
-        logger.info("NDAService initialized successfully")
+        # Only initialize Gemini if API key is available (for modification features)
+        if self.api_key:
+            try:
+                genai.configure(api_key=self.api_key)
+                
+                # Set up the model generation configuration
+                self.generation_config = {
+                    "temperature": 0.2,
+                    "top_p": 1,
+                    "top_k": 1,
+                    "max_output_tokens": 8192,
+                }
+                
+                # Initialize the Generative Model with system instruction for modifications
+                self.model = genai.GenerativeModel(
+                    model_name="gemini-2.5-flash-lite-preview-06-17",
+                    generation_config=self.generation_config,
+                    system_instruction=CHAT_SYSTEM_PROMPT
+                )
+                
+                logger.info("NDAService initialized with Gemini API for modifications")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini API: {e}. Modification features will be unavailable.")
+                self.model = None
+        else:
+            logger.info("NDAService initialized without Gemini API (template-based generation only)")
     
     def generate_nda_text(self, user_inputs: dict) -> str:
         """
-        Generate NDA text based on user inputs.
+        Generate NDA text based on user inputs using Jinja2 templates.
         
         Args:
             user_inputs: Dictionary containing NDA parameters:
-                - client_name: Client company name (Party 1)
-                - client_type_and_address: Client type and address
-                - counterparty_name: Counterparty name (Party 2)
-                - counterparty_type_and_address: Counterparty type and address
-                - party_role: Which party is the client ("Receiving Party", "Disclosing Party", "Both (Bilateral)")
+                - first_party: First party company name
+                - first_party_address: Address of the first party
+                - first_party_incorporation_state: Incorporation state of the first party
+                - first_party_representative: Representative of the first party
+                - first_party_registration_number: Registration number of the first party
+                - first_party_role: Role of first party ("Receiving Party", "Disclosing Party", "Both (Bilateral)")
+                - second_party: Second party company name
+                - second_party_address: Address of the second party
+                - second_party_incorporation_state: Incorporation state of the second party
+                - second_party_representative: Representative of the second party
+                - second_party_registration_number: Registration number of the second party
                 - purpose: Purpose of disclosure
                 - applicable_law: Governing law
                 - language: Language of the contract
                 - duration: Duration of confidentiality in months
-                - effective_date: Effective date of the agreement
+                - date: Effective date of the agreement (ISO format)
                 - litigation: Dispute resolution mechanism
         
         Returns:
@@ -80,43 +110,72 @@ class NDAService:
         
         Raises:
             ValueError: If required fields are missing.
-            Exception: If Gemini API call fails.
         """
-        # Validate required fields
-        required_fields = [
-            "client_name", "client_type_and_address", 
-            "counterparty_name", "counterparty_type_and_address",
-            "party_role", "purpose", "applicable_law", 
-            "language", "duration", "litigation"
-        ]
+        # Set default date if not provided
+        if "date" not in user_inputs or not user_inputs["date"]:
+            user_inputs["date"] = date.today().strftime("%Y-%m-%d")
         
-        missing_fields = [field for field in required_fields if field not in user_inputs or not user_inputs[field]]
-        if missing_fields:
-            raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
-        
-        # Determine nature of obligations based on party role
-        if user_inputs["party_role"] != "Both (Bilateral)":
-            user_inputs["nature_of_obligations"] = "Unilateral"
-        else:
-            user_inputs["nature_of_obligations"] = "Bilateral"
-        
-        # Set default effective date if not provided
-        if "effective_date" not in user_inputs or not user_inputs["effective_date"]:
-            user_inputs["effective_date"] = date.today().isoformat()
-        
-        # Build the prompt using the rules engine
-        prompt = build_llm_prompt(user_inputs)
-        
-        logger.info(f"Generating NDA for client: {user_inputs['client_name']}, counterparty: {user_inputs['counterparty_name']}")
+        logger.info(f"Generating NDA for first_party: {user_inputs.get('first_party', 'N/A')}, "
+                   f"second_party: {user_inputs.get('second_party', 'N/A')}")
         
         try:
-            response = self.model.generate_content(prompt)
-            nda_text = response.text
-            logger.info("NDA text generated successfully")
+            nda_text = render_template(user_inputs)
+            logger.info("NDA text generated successfully using Jinja2 template")
             return nda_text
+        except ValueError as e:
+            logger.error(f"Validation error generating NDA: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error generating NDA text: {e}")
             raise Exception(f"Failed to generate NDA: {str(e)}")
+    
+    def modify_nda(self, nda_text: str, modification_request: str, 
+                   conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
+        """
+        Modify an existing NDA using Google Gemini API.
+        
+        Args:
+            nda_text: The current NDA text to modify.
+            modification_request: User's request for how to modify the NDA.
+            conversation_history: Optional list of previous conversation messages
+                                  for context. Each message is a dict with 'role' and 'parts' keys.
+        
+        Returns:
+            Modified NDA text as a string.
+        
+        Raises:
+            ValueError: If Gemini API is not available.
+            Exception: If Gemini API call fails.
+        """
+        if not self.model:
+            raise ValueError("Gemini API is not available. Please provide GEMINI_API_KEY to enable modification features.")
+        
+        # Build conversation history if provided
+        history = []
+        if conversation_history:
+            history = conversation_history
+        else:
+            # Initialize with the current NDA as the first model response
+            history = [
+                {"role": "user", "parts": ["Please review this NDA."]},
+                {"role": "model", "parts": [nda_text]}
+            ]
+        
+        logger.info(f"Modifying NDA with request: {modification_request[:100]}...")
+        
+        try:
+            # Start a chat session with history
+            chat_session = self.model.start_chat(history=history)
+            
+            # Send the modification request
+            response = chat_session.send_message(modification_request)
+            modified_text = response.text
+            
+            logger.info("NDA modified successfully")
+            return modified_text
+        except Exception as e:
+            logger.error(f"Error modifying NDA: {e}")
+            raise Exception(f"Failed to modify NDA: {str(e)}")
     
     def create_docx(self, nda_text: str, client_name: str = "", counterparty_name: str = "") -> bytes:
         """
@@ -163,7 +222,7 @@ class NDAService:
         nda_text = self.generate_nda_text(user_inputs)
         docx_bytes = self.create_docx(
             nda_text, 
-            user_inputs.get("client_name", ""),
-            user_inputs.get("counterparty_name", "")
+            user_inputs.get("first_party", ""),
+            user_inputs.get("second_party", "")
         )
         return nda_text, docx_bytes

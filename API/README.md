@@ -217,6 +217,75 @@ curl -X POST "http://localhost:5001/index/document/" \
 
 **Supported Formats**: `.pdf`, `.docx`, `.txt`
 
+### ✍️ NDA Generator
+
+#### POST `/nda/generate`
+Generate a Non-Disclosure Agreement based on provided parameters using AI.
+
+**Request Body** (`NDAGenerateRequest`):
+```json
+{
+  "client_name": "OCP",
+  "client_type_and_address": "Public Company, Casablanca, Morocco",
+  "counterparty_name": "Tech Solutions Inc.",
+  "counterparty_type_and_address": "Private Company, Paris, France",
+  "party_role": "Receiving Party",
+  "purpose": "To evaluate a potential business partnership",
+  "applicable_law": "English Law",
+  "language": "English",
+  "duration": 36,
+  "litigation": "Arbitration under ICC Rules, seat in Paris",
+  "effective_date": "2025-01-07"
+}
+```
+
+**Response**:
+```json
+{
+  "message": "NDA generated successfully",
+  "statusCode": 200,
+  "data": {
+    "nda_text": "NON-DISCLOSURE AGREEMENT\n\nThis Non-Disclosure Agreement...",
+    "prompt": "You are an expert legal AI assistant...",
+    "client_name": "OCP",
+    "counterparty_name": "Tech Solutions Inc."
+  }
+}
+```
+
+**Parameters**:
+- `party_role`: Options are `"Receiving Party"`, `"Disclosing Party"`, or `"Both (Bilateral)"`
+- `applicable_law`: e.g., `"English Law"`, `"French Law"`, `"Moroccan Law"`
+- `litigation`: e.g., `"Arbitration under ICC Rules, seat in Paris"`, `"Arbitration under LCIA Rules, seat in London"`
+- `duration`: Duration of confidentiality obligations in months
+- `effective_date`: Optional, defaults to today if not provided
+
+#### POST `/nda/generate/docx`
+Generate a Non-Disclosure Agreement and return it as a downloadable Word document.
+
+**Request Body**: Same as `/nda/generate`
+
+**Response**: Word document (.docx) file download
+
+**Example using curl**:
+```bash
+curl -X POST "http://localhost:5001/nda/generate/docx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "OCP",
+    "client_type_and_address": "Public Company, Casablanca, Morocco",
+    "counterparty_name": "Tech Solutions Inc.",
+    "counterparty_type_and_address": "Private Company, Paris, France",
+    "party_role": "Both (Bilateral)",
+    "purpose": "To evaluate a potential business partnership",
+    "applicable_law": "French Law",
+    "language": "French",
+    "duration": 24,
+    "litigation": "Arbitration under LCIA Rules, seat in London"
+  }' \
+  --output NDA_OCP_TechSolutions.docx
+```
+
 ### 📊 Task Management
 
 #### GET `/task_status/{task_id}`
@@ -278,6 +347,9 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 
 # Python Configuration
 PYTHONUNBUFFERED=1
+
+# NDA Generator Configuration
+GEMINI_API_KEY=your-google-gemini-api-key
 ```
 
 ### Docker Compose Configuration
@@ -365,6 +437,10 @@ API/
 ├── requirements.txt      # Python dependencies
 ├── docker-compose.yml    # Service orchestration
 ├── Dockerfile            # Container image definition
+├── nda_generator/        # NDA generation module
+│   ├── __init__.py       # Module initialization
+│   ├── nda_service.py    # NDA generation service using Gemini AI
+│   └── rules_engine.py   # NDA drafting rules and prompt builder
 ├── tests/
 │   └── test_api_calls.py # API integration tests
 └── README.md            # This file

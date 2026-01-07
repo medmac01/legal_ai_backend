@@ -220,22 +220,27 @@ curl -X POST "http://localhost:5001/index/document/" \
 ### ✍️ NDA Generator
 
 #### POST `/nda/generate`
-Generate a Non-Disclosure Agreement based on provided parameters using AI.
+Generate a Non-Disclosure Agreement based on provided parameters. Returns JSON format with generated NDA text.
 
 **Request Body** (`NDAGenerateRequest`):
 ```json
 {
-  "client_name": "OCP",
-  "client_type_and_address": "Public Company, Casablanca, Morocco",
-  "counterparty_name": "Tech Solutions Inc.",
-  "counterparty_type_and_address": "Private Company, Paris, France",
-  "party_role": "Receiving Party",
+  "first_party": "OCP",
+  "first_party_address": "Casablanca, Morocco",
+  "first_party_incorporation_state": "Morocco",
+  "first_party_representative": "John Doe",
+  "first_party_registration_number": "OCP-2024-001",
+  "first_party_role": "Disclosing Party",
+  "second_party": "Tech Solutions Inc.",
+  "second_party_address": "Paris, France",
+  "second_party_incorporation_state": "France",
+  "second_party_representative": "Jane Smith",
+  "second_party_registration_number": "TSI-2024-001",
   "purpose": "To evaluate a potential business partnership",
-  "applicable_law": "English Law",
-  "language": "English",
-  "duration": 36,
-  "litigation": "Arbitration under ICC Rules, seat in Paris",
-  "effective_date": "2025-01-07"
+  "applicable_law": "French Law",
+  "language": "French",
+  "duration": 24,
+  "litigation": "Arbitration under LCIA Rules, seat in London"
 }
 ```
 
@@ -247,23 +252,58 @@ Generate a Non-Disclosure Agreement based on provided parameters using AI.
   "data": {
     "nda_text": "NON-DISCLOSURE AGREEMENT\n\nThis Non-Disclosure Agreement...",
     "prompt": "You are an expert legal AI assistant...",
-    "client_name": "OCP",
-    "counterparty_name": "Tech Solutions Inc."
+    "first_party": "OCP",
+    "second_party": "Tech Solutions Inc."
   }
 }
 ```
 
-**Parameters**:
-- `party_role`: Options are `"Receiving Party"`, `"Disclosing Party"`, or `"Both (Bilateral)"`
-- `applicable_law`: e.g., `"English Law"`, `"French Law"`, `"Moroccan Law"`
-- `litigation`: e.g., `"Arbitration under ICC Rules, seat in Paris"`, `"Arbitration under LCIA Rules, seat in London"`
-- `duration`: Duration of confidentiality obligations in months
-- `effective_date`: Optional, defaults to today if not provided
+**Required Parameters**:
+- `first_party`: Name of the first party (string)
+- `first_party_address`: Full address of the first party (string)
+- `first_party_incorporation_state`: State/Country of incorporation (string)
+- `first_party_representative`: Name of authorized representative (string)
+- `first_party_registration_number`: Company registration number (string)
+- `first_party_role`: Role of first party (`"Disclosing Party"`, `"Receiving Party"`, or `"Both"`)
+- `second_party`: Name of the second party (string)
+- `second_party_address`: Full address of the second party (string)
+- `second_party_incorporation_state`: State/Country of incorporation (string)
+- `second_party_representative`: Name of authorized representative (string)
+- `second_party_registration_number`: Company registration number (string)
+- `purpose`: Purpose of the NDA agreement (string)
+- `applicable_law`: Governing law (e.g., `"French Law"`, `"English Law"`, `"Moroccan Law"`)
+- `language`: Language of the agreement (e.g., `"French"`, `"English"`)
+- `duration`: Confidentiality duration in months (integer)
+- `litigation`: Dispute resolution clause (e.g., `"Arbitration under LCIA Rules, seat in London"`)
+
+**Example using curl**:
+```bash
+curl -X POST "http://localhost:5001/nda/generate" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_party": "OCP",
+    "first_party_address": "Casablanca, Morocco",
+    "first_party_incorporation_state": "Morocco",
+    "first_party_representative": "John Doe",
+    "first_party_registration_number": "OCP-2024-001",
+    "first_party_role": "Disclosing Party",
+    "second_party": "Tech Solutions Inc.",
+    "second_party_address": "Paris, France",
+    "second_party_incorporation_state": "France",
+    "second_party_representative": "Jane Smith",
+    "second_party_registration_number": "TSI-2024-001",
+    "purpose": "To evaluate a potential business partnership",
+    "applicable_law": "French Law",
+    "language": "French",
+    "duration": 24,
+    "litigation": "Arbitration under LCIA Rules, seat in London"
+  }'
+```
 
 #### POST `/nda/generate/docx`
-Generate a Non-Disclosure Agreement and return it as a downloadable Word document.
+Generate a Non-Disclosure Agreement and return it as a downloadable Word document (.docx file).
 
-**Request Body**: Same as `/nda/generate`
+**Request Body**: Same as `/nda/generate` endpoint
 
 **Response**: Word document (.docx) file download
 
@@ -272,19 +312,41 @@ Generate a Non-Disclosure Agreement and return it as a downloadable Word documen
 curl -X POST "http://localhost:5001/nda/generate/docx" \
   -H "Content-Type: application/json" \
   -d '{
-    "client_name": "OCP",
-    "client_type_and_address": "Public Company, Casablanca, Morocco",
-    "counterparty_name": "Tech Solutions Inc.",
-    "counterparty_type_and_address": "Private Company, Paris, France",
-    "party_role": "Both (Bilateral)",
+    "first_party": "OCP",
+    "first_party_address": "Casablanca, Morocco",
+    "first_party_incorporation_state": "Morocco",
+    "first_party_representative": "John Doe",
+    "first_party_registration_number": "OCP-2024-001",
+    "first_party_role": "Disclosing Party",
+    "second_party": "Tech Solutions Inc.",
+    "second_party_address": "Paris, France",
+    "second_party_incorporation_state": "France",
+    "second_party_representative": "Jane Smith",
+    "second_party_registration_number": "TSI-2024-001",
     "purpose": "To evaluate a potential business partnership",
     "applicable_law": "French Law",
     "language": "French",
     "duration": 24,
     "litigation": "Arbitration under LCIA Rules, seat in London"
   }' \
-  --output NDA_OCP_TechSolutions.docx
+  --output NDA_OCP_TechSolutions.docx -w "\nHTTP Status: %{http_code}\n"
 ```
+
+**Response**:
+- **Success (200)**: Binary .docx file stream
+- **Validation Error (422)**: JSON error with missing field details
+- **Server Error (500)**: JSON error message
+
+**Document Generation**:
+The generated DOCX file is a professionally formatted NDA document containing:
+- Preamble with party information
+- Definitions of confidential information
+- Obligations of receiving party
+- Permitted disclosures and exceptions
+- Term and termination clauses
+- Dispute resolution provisions
+- Signature blocks for both parties
+- All customized based on the provided parameters
 
 ### 📊 Task Management
 

@@ -4,7 +4,13 @@
 NDA_DRAFTING_RULES = {
     "Preamble and Parties": {
         "description": "The introductory section identifying the parties and effective date.",
-        "instructions": "Draft a standard preamble for a Non-Disclosure Agreement between [Party 1 Name], [Party 1 Type and Address], and [Party 2 Name], [Party 2 Type and Address]. The effective date should be [Effective Date]. Clearly identify which party is the Disclosing Party and which is the Receiving Party based on the user's role selection. If it's a bilateral agreement, state that both parties will act as Disclosing and Receiving Parties."
+        # "instructions": "Draft a standard preamble for a Non-Disclosure Agreement between [Party 1 Name], [Party 1 Type and Address], and [Party 2 Name], [Party 2 Type and Address]. The effective date should be [Effective Date]. Clearly identify which party is the Disclosing Party and which is the Receiving Party based on the user's role selection. If it's a bilateral agreement, state that both parties will act as Disclosing and Receiving Parties.",
+        "instructions": [
+            "This Non-Disclosure Agreement (the \"Agreement\") is entered into as of [Effective Date] (the \"Effective Date\"), between\n",
+            "[Party 1 Name], a public limited liability company duly organized and existing under the laws of Morocco, with a share capital of [Capital], having its registered office at [First Party Address], incorporated with the Register of Companies of Casablanca under number [First Party Registration Number], represented by [First Party Representative], duly empowered (hereinafter referred to as the 'Disclosing Party');\n And,\n",
+            "[Party 2 Name], a public limited liability company duly organized and existing under the laws of Morocco, with a share capital of [Capital], having its registered office at [Second Party Address], incorporated with the Register of Companies of Benguerir under number [Second Party Registration Number], represented by [Second Party Representative], duly empowered (hereinafter referred to as the 'Receiving Party');\n\n",
+            "The Disclosing Party and the Receiving Party are hereinafter collectively referred to as the \"Parties\" and individually as a \"Party\".\n",
+        ]
     },
     "Purpose": {
         "description": "The 'Whereas' or 'Background' clause.",
@@ -76,7 +82,7 @@ NDA_DRAFTING_RULES = {
         "receiving": [
             "The above provisions are applicable, unless: \n",
             "a) disclosure is required by binding law and non-disclosure could expose the Party bound by confidentiality to criminal or administrative responsibility or,\n",
-            "b) disclosure is required or indispensable to protect the Party's interests in judicial or administrative proceedings, \n",
+            "b) disclosure is required or indispensable to protect the Party’s interests in judicial or administrative proceedings, \n",
             "c) in such case provided that the Parties – immediately after being informed on a possible duty or need for disclosure and as far as it will be possible prior to such disclosure - take all reasonable steps to promptly and sufficiently notify each other thereof. \n",
         ],
         "disclosing": [
@@ -112,19 +118,19 @@ NDA_DRAFTING_RULES = {
     "Use of Confidential Information": {
         "description": "How the Receiving Party can use the information.",
         "receiving": [
-            "Each Party undertakes to keep the same standard of care in protecting such other Party's Confidential Information as a Party normally employs to preserve and safeguard its own Confidential Information.",
+            "Each Party undertakes to keep the same standard of care in protecting such other Party’s Confidential Information as a Party normally employs to preserve and safeguard its own Confidential Information.",
             "Confidential Information may be disclosed solely to those Representatives of a Party who have a need to know such information for the purposes of the cooperation.",
             "All Confidential Information and any copies thereof shall be returned to the other Party promptly upon written request."
         ],
         "disclosing": [
-            "Each Party undertakes to keep the same standard of care in protecting such other Party's Confidential Information as a Party normally employs to preserve and safeguard its own Confidential Information.",
+            "Each Party undertakes to keep the same standard of care in protecting such other Party’s Confidential Information as a Party normally employs to preserve and safeguard its own Confidential Information.",
             "Confidential Information may be disclosed only to those Representatives of the Receiving Party who have a strict need to know such information solely for the purposes of the cooperation, and who are bound by confidentiality obligations no less protective than those in this Agreement.",
             "The Receiving Party shall not reproduce, copy, or otherwise duplicate any Confidential Information without the prior written consent of the Disclosing Party.",
             "The Receiving Party agrees to take all necessary steps to safeguard the Confidential Information from loss, theft, unauthorized access, or destruction, and to ensure its secure handling and storage.",
             "All Confidential Information and any copies thereof shall be returned to the other Party promptly upon written request, or destroyed at the Disclosing Party's option, with a written certificate of destruction provided by the Receiving Party."
         ],
         "mutual": [
-            "Each Party undertakes to keep the same standard of care in protecting the other Party's Confidential Information as it normally employs to preserve and safeguard its own Confidential Information.",
+            "Each Party undertakes to keep the same standard of care in protecting the other Party’s Confidential Information as it normally employs to preserve and safeguard its own Confidential Information.",
             "Confidential Information may be disclosed only to those Representatives of the Receiving Party who have a strict need to know such information solely for the purposes of the cooperation, and who are bound by confidentiality obligations no less protective than those in this Agreement.",
             "All Confidential Information and any copies thereof shall be returned to the other Party promptly upon written request, or destroyed at the Disclosing Party's option, with a written certificate of destruction provided by the Receiving Party."
         ]
@@ -138,18 +144,18 @@ NDA_DRAFTING_RULES = {
     "Responsibility": {
         "description": "Who is responsible for breaches by Representatives.",
         "receiving": [
-            "Each Party hereto is fully liable for damages to the other Party for any harm or damage caused to the other Party or that Party's customers or business partners due to violation of the terms of this Agreement, including for any harm or damage caused by the breaching Party's Representatives.",
+            "Each Party hereto is fully liable for damages to the other Party for any harm or damage caused to the other Party or that Party’s customers or business partners due to violation of the terms of this Agreement, including for any harm or damage caused by the breaching Party’s Representatives.",
         ],
         "disclosing": [
-            "Each Party hereto is fully liable for damages to the other Party for any harm or damage caused to the other Party or that Party's customers or business partners due to violation of the terms of this Agreement, including for any harm or damage caused by the breaching Party's Representatives.",
+            "Each Party hereto is fully liable for damages to the other Party for any harm or damage caused to the other Party or that Party’s customers or business partners due to violation of the terms of this Agreement, including for any harm or damage caused by the breaching Party’s Representatives.",
         ],
-        "mutual": "Each Party hereto is fully liable for damages to the other Party for any harm or damage caused to the other Party or that Party's customers or business partners due to violation of the terms of this Agreement, including for any harm or damage caused by the breaching Party's Representatives."
+        "mutual": "Each Party hereto is fully liable for damages to the other Party for any harm or damage caused to the other Party or that Party’s customers or business partners due to violation of the terms of this Agreement, including for any harm or damage caused by the breaching Party’s Representatives."
     },
     "Notices": {
         "description": "Standard boilerplate clause for notices.",
-        "receiving": "Any notifications and statements pursuant to this Agreement shall be made in writing and sent via courier services or via registered mail to the Parties' addresses [Party 1 Type and Address] for [Party 1 Name] and [Party 2 Type and Address] for [Party 2 Name] set forth in the heading of this Agreement or to the e-mail addresses agreed between the Parties.",
-        "disclosing": "Any notifications and statements pursuant to this Agreement shall be made in writing and sent via courier services or via registered mail to the Parties' addresses [Party 1 Type and Address] for [Party 1 Name] and [Party 2 Type and Address] for [Party 2 Name] set forth in the heading of this Agreement or to the e-mail addresses agreed between the Parties.",
-        "mutual": "Any notifications and statements pursuant to this Agreement shall be made in writing and sent via courier services or via registered mail to the Parties' addresses [Party 1 Type and Address] for [Party 1 Name] and [Party 2 Type and Address] for [Party 2 Name] set forth in the heading of this Agreement or to the e-mail addresses agreed between the Parties."
+        "receiving": "Any notifications and statements pursuant to this Agreement shall be made in writing and sent via courier services or via registered mail to the Parties’ addresses [Party 1 Type and Address] for [Party 1 Name] and [Party 2 Type and Address] for [Party 2 Name] set forth in the heading of this Agreement or to the e-mail addresses agreed between the Parties.",
+        "disclosing": "Any notifications and statements pursuant to this Agreement shall be made in writing and sent via courier services or via registered mail to the Parties’ addresses [Party 1 Type and Address] for [Party 1 Name] and [Party 2 Type and Address] for [Party 2 Name] set forth in the heading of this Agreement or to the e-mail addresses agreed between the Parties.",
+        "mutual": "Any notifications and statements pursuant to this Agreement shall be made in writing and sent via courier services or via registered mail to the Parties’ addresses [Party 1 Type and Address] for [Party 1 Name] and [Party 2 Type and Address] for [Party 2 Name] set forth in the heading of this Agreement or to the e-mail addresses agreed between the Parties."
     },
 
     "Applicable Law and Jurisdiction": {
@@ -186,24 +192,36 @@ def get_role_key(party_role):
 def build_llm_prompt(user_inputs):
     """Builds a structured prompt for the LLM based on user inputs and rules."""
     
-    role_key = get_role_key(user_inputs["party_role"])
+    role_key = get_role_key(user_inputs["first_party_role"])
 
     prompt = f"""
 You are an expert legal AI assistant. Your task is to draft a complete Non-Disclosure Agreement based on the following context and specific clause-by-clause instructions.
 
 **OVERALL CONTEXT:**
 - This is a {user_inputs['nature_of_obligations']} Non-Disclosure Agreement.
-- Our Client's Role: {user_inputs['party_role']}.
-- Party 1 (Our Client): {user_inputs['client_name']}
-- Party 1 Type and Address: {user_inputs['client_type_and_address']}
-- Party 2 (Counterparty): {user_inputs['counterparty_name']}
-- Party 2 Type and Address: {user_inputs['counterparty_type_and_address']}
+
+- First Party: {user_inputs['first_party']}.
+- First Party Role: {user_inputs['first_party_role']}.
+- First Party Address: {user_inputs['first_party_address']}.
+- First Party Incorporation State: {user_inputs['first_party_incorporation_state']}.
+- First Party Registration Number: {user_inputs['first_party_registration_number']}.
+- First Party Representative: {user_inputs['first_party_representative']}.
+
+- Second Party: {user_inputs['second_party']}.
+- Second Party Role: {user_inputs['second_party_role']}.
+- Second Party Adress: {user_inputs['second_party_adress']}.
+- Second Party Incorporation State: {user_inputs['second_party_incorporation_state']}.
+- Second Party Registration Number: {user_inputs['second_party_registration_number']}.
+- Second Party Representative: {user_inputs['second_party_representative']}.
+
+- Purpose of Disclosure Type: {user_inputs['purpose_type']}
 - Purpose of Disclosure: {user_inputs['purpose']}
 - Applicable Law: {user_inputs['applicable_law']}
 - Dispute Resolution (Litigation): {user_inputs['litigation']}
 - Duration of Confidentiality: {user_inputs['duration']} months
 - Language of the Contract: {user_inputs['language']}
 - Effective Date: {user_inputs.get('effective_date', 'Today')}
+
 **DRAFTING INSTRUCTIONS - CLAUSE BY CLAUSE:**
 
 """
@@ -233,12 +251,12 @@ You are an expert legal AI assistant. Your task is to draft a complete Non-Discl
     prompt += GENERAL_DRAFTING_INSTRUCTIONS
 
     # Replace placeholders in the prompt itself
-    prompt = prompt.replace("[Party 1 Name]", user_inputs['client_name'])
-    prompt = prompt.replace("[Party 2 Name]", user_inputs['counterparty_name'])
-    prompt = prompt.replace("[Party 1 Type and Address]", user_inputs['client_type_and_address'])
-    prompt = prompt.replace("[Party 2 Type and Address]", user_inputs['counterparty_type_and_address'])
-    prompt = prompt.replace("[Effective Date]", str(user_inputs.get('effective_date', 'Today')))
-    prompt = prompt.replace("[Party 1 Role]", user_inputs['party_role'])
+    prompt = prompt.replace("[Party 1 Name]", user_inputs['first_party'])
+    prompt = prompt.replace("[Party 2 Name]", user_inputs['second_party'])
+    prompt = prompt.replace("[Party 1 Type and Address]", user_inputs['first_party_adress'])
+    prompt = prompt.replace("[Party 2 Type and Address]", user_inputs['second_party_adress'])
+    prompt = prompt.replace("[Effective Date]", str(user_inputs.get('date', 'Today')))
+    prompt = prompt.replace("[Party 1 Role]", user_inputs['first_party_role'])
     prompt = prompt.replace("[Nature of Obligations]", user_inputs['nature_of_obligations'])
     prompt = prompt.replace("[Language]", user_inputs['language'])
     prompt = prompt.replace("[Duration]", str(user_inputs['duration']))

@@ -8,6 +8,7 @@ Author: Raptopoulos Petros [petrosrapto@gmail.com]
 Date  : 2025/02/09
 """
 
+from datetime import date
 from fastapi import FastAPI, UploadFile, File, Form, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -854,6 +855,208 @@ async def delete_conversation(
     except Exception as e:
         logger.error(f"Error deleting conversation: {str(e)}")
         return create_response("Failed to delete conversation", 500, {"error": str(e)})
+
+# ==================== NDA Generator Endpoints ====================
+
+class NDAGenerateRequest(BaseModel):
+    """
+    Request model for NDA generation.
+    """
+    client_name: str
+    client_type_and_address: str
+    counterparty_name: str
+    counterparty_type_and_address: str
+    party_role: str  # "Receiving Party", "Disclosing Party", or "Both (Bilateral)"
+    purpose: str
+    applicable_law: str
+    language: str
+    duration: int  # Duration in months
+    litigation: str
+    effective_date: Optional[str] = None
+
+@app.post("/nda/generate", tags=["NDA Generator"])
+async def generate_nda(
+    request: NDAGenerateRequest,
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Generate a Non-Disclosure Agreement**
+
+    This endpoint generates an NDA document based on the provided parameters using AI.
+    The generated NDA text is returned in the response.
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header (if authentication is enabled)
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Parameters:**
+    - `client_name`: Client company name (Party 1)
+    - `client_type_and_address`: Client type and address
+    - `counterparty_name`: Counterparty name (Party 2)
+    - `counterparty_type_and_address`: Counterparty type and address
+    - `party_role`: Which party is the client ("Receiving Party", "Disclosing Party", "Both (Bilateral)")
+    - `purpose`: Purpose of disclosure
+    - `applicable_law`: Governing law (e.g., "English Law", "French Law", "Moroccan Law")
+    - `language`: Language of the contract (e.g., "English", "French")
+    - `duration`: Duration of confidentiality in months
+    - `litigation`: Dispute resolution mechanism
+    - `effective_date`: Optional effective date (ISO format, defaults to today)
+
+    **Response:**
+    - Returns the generated NDA text and the prompt used.
+
+    **Example Request:**
+    ```json
+    {
+        "client_name": "OCP",
+        "client_type_and_address": "Public Company, Casablanca, Morocco",
+        "counterparty_name": "Tech Solutions Inc.",
+        "counterparty_type_and_address": "Private Company, Paris, France",
+        "party_role": "Receiving Party",
+        "purpose": "To evaluate a potential business partnership",
+        "applicable_law": "English Law",
+        "language": "English",
+        "duration": 36,
+        "litigation": "Arbitration under ICC Rules, seat in Paris",
+        "effective_date": "2025-01-07"
+    }
+    ```
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"NDA generation request - User: {user_info}, Client: {request.client_name}, Counterparty: {request.counterparty_name}")
+    
+    try:
+        from .nda_generator import NDAService, build_llm_prompt
+        
+        # Prepare user inputs
+        user_inputs = {
+            "client_name": request.client_name,
+            "client_type_and_address": request.client_type_and_address,
+            "counterparty_name": request.counterparty_name,
+            "counterparty_type_and_address": request.counterparty_type_and_address,
+            "party_role": request.party_role,
+            "purpose": request.purpose,
+            "applicable_law": request.applicable_law,
+            "language": request.language,
+            "duration": request.duration,
+            "litigation": request.litigation,
+            "effective_date": request.effective_date,
+        }
+        
+        # Initialize NDA service and generate
+        nda_service = NDAService()
+        nda_text = nda_service.generate_nda_text(user_inputs)
+        
+        # Build prompt for reference (without making another API call)
+        user_inputs["nature_of_obligations"] = "Unilateral" if request.party_role != "Both (Bilateral)" else "Bilateral"
+        if not user_inputs.get("effective_date"):
+            user_inputs["effective_date"] = date.today().isoformat()
+        prompt = build_llm_prompt(user_inputs)
+        
+        logger.info(f"NDA generated successfully for client: {request.client_name}")
+        
+        return create_response(
+            "NDA generated successfully",
+            200,
+            {
+                "nda_text": nda_text,
+                "prompt": prompt,
+                "client_name": request.client_name,
+                "counterparty_name": request.counterparty_name
+            }
+        )
+    except ValueError as e:
+        logger.error(f"Validation error in NDA generation: {str(e)}")
+        return create_response("Validation error", 400, {"error": str(e)})
+    except Exception as e:
+        logger.error(f"Error generating NDA: {str(e)}")
+        return create_response("Failed to generate NDA", 500, {"error": str(e)})
+
+@app.post("/nda/generate/docx", tags=["NDA Generator"])
+async def generate_nda_docx(
+    request: NDAGenerateRequest,
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Generate a Non-Disclosure Agreement as a Word Document**
+
+    This endpoint generates an NDA document based on the provided parameters using AI
+    and returns it as a downloadable Word document (.docx).
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header (if authentication is enabled)
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Parameters:**
+    Same as `/nda/generate` endpoint.
+
+    **Response:**
+    - Returns a Word document (.docx) file for download.
+
+    **Example Request:**
+    ```json
+    {
+        "client_name": "OCP",
+        "client_type_and_address": "Public Company, Casablanca, Morocco",
+        "counterparty_name": "Tech Solutions Inc.",
+        "counterparty_type_and_address": "Private Company, Paris, France",
+        "party_role": "Both (Bilateral)",
+        "purpose": "To evaluate a potential business partnership",
+        "applicable_law": "French Law",
+        "language": "French",
+        "duration": 24,
+        "litigation": "Arbitration under LCIA Rules, seat in London"
+    }
+    ```
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"NDA DOCX generation request - User: {user_info}, Client: {request.client_name}, Counterparty: {request.counterparty_name}")
+    
+    try:
+        from .nda_generator import NDAService
+        from io import BytesIO
+        
+        # Prepare user inputs
+        user_inputs = {
+            "client_name": request.client_name,
+            "client_type_and_address": request.client_type_and_address,
+            "counterparty_name": request.counterparty_name,
+            "counterparty_type_and_address": request.counterparty_type_and_address,
+            "party_role": request.party_role,
+            "purpose": request.purpose,
+            "applicable_law": request.applicable_law,
+            "language": request.language,
+            "duration": request.duration,
+            "litigation": request.litigation,
+            "effective_date": request.effective_date,
+        }
+        
+        # Initialize NDA service and generate
+        nda_service = NDAService()
+        nda_text, docx_bytes = nda_service.generate_nda_with_docx(user_inputs)
+        
+        # Create filename
+        client_clean = request.client_name.replace(" ", "")
+        counterparty_clean = request.counterparty_name.replace(" ", "")
+        filename = f"NDA_{client_clean}_{counterparty_clean}.docx"
+        
+        logger.info(f"NDA DOCX generated successfully: {filename}")
+        
+        return StreamingResponse(
+            BytesIO(docx_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except ValueError as e:
+        logger.error(f"Validation error in NDA DOCX generation: {str(e)}")
+        return create_response("Validation error", 400, {"error": str(e)})
+    except Exception as e:
+        logger.error(f"Error generating NDA DOCX: {str(e)}")
+        return create_response("Failed to generate NDA document", 500, {"error": str(e)})
+
+# ==================== End of NDA Generator Endpoints ====================
 
 @app.get("/health", tags=["Health Check"])
 def health_check():

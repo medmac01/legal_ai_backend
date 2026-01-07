@@ -29,6 +29,7 @@ services:
     build:
       context: ..
       dockerfile: API/Dockerfile
+      network: host
     depends_on:
       - rabbitmq
       - redis
@@ -52,6 +53,7 @@ services:
     build:
       context: ..
       dockerfile: API/Dockerfile
+      network: host
     depends_on:
       - multiagentframework_service
       - rabbitmq

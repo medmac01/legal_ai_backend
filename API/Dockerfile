@@ -11,6 +11,9 @@ FROM python:3.11.11-slim
 
 WORKDIR /app
 
+# Use Debian mirror (university network blocks deb.debian.org)
+RUN sed -i 's|deb.debian.org|debian.polytech-lille.fr|g' /etc/apt/sources.list.d/debian.sources
+
 # Install system dependencies (Tesseract and Poppler)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \

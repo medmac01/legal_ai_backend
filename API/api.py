@@ -8,6 +8,7 @@ Author: Raptopoulos Petros [petrosrapto@gmail.com]
 Date  : 2025/02/09
 """
 
+from datetime import date
 from fastapi import FastAPI, UploadFile, File, Form, Depends
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -949,7 +950,6 @@ async def generate_nda(
         # Build prompt for reference (without making another API call)
         user_inputs["nature_of_obligations"] = "Unilateral" if request.party_role != "Both (Bilateral)" else "Bilateral"
         if not user_inputs.get("effective_date"):
-            from datetime import date
             user_inputs["effective_date"] = date.today().isoformat()
         prompt = build_llm_prompt(user_inputs)
         

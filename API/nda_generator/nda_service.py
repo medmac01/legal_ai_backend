@@ -9,8 +9,9 @@ Date  : 2025/01/07
 
 import os
 import logging
+from datetime import date
 from io import BytesIO
-from typing import Optional
+from typing import Optional, Tuple
 
 import google.generativeai as genai
 from docx import Document
@@ -101,7 +102,6 @@ class NDAService:
         
         # Set default effective date if not provided
         if "effective_date" not in user_inputs or not user_inputs["effective_date"]:
-            from datetime import date
             user_inputs["effective_date"] = date.today().isoformat()
         
         # Build the prompt using the rules engine
@@ -150,7 +150,7 @@ class NDAService:
         logger.info("Word document created successfully")
         return bio.getvalue()
     
-    def generate_nda_with_docx(self, user_inputs: dict) -> tuple[str, bytes]:
+    def generate_nda_with_docx(self, user_inputs: dict) -> Tuple[str, bytes]:
         """
         Generate NDA text and create a Word document.
         

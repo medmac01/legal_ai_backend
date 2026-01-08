@@ -44,6 +44,8 @@ services:
     ports:
       - "5001:5001"
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - chroma_data:/chroma_db
@@ -76,6 +78,8 @@ services:
       SERVICE_NAME: "multiagentframework_service"
       PYTHONUNBUFFERED: "1"
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - chroma_data:/chroma_db

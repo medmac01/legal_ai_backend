@@ -322,6 +322,132 @@ def async_research(self, query: str, instructions: str = "", agent_config: dict 
             message=f"Failed to research: {e}"
         )
 
+@celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.ingest_law_chunks', bind=True, default_retry_delay=5, max_retries=3)
+def async_ingest_law_chunks(self, chunks_file_path: str = None):
+    """
+    Asynchronous ingestion of pre-chunked law data from a JSON file into the vector database.
+
+    This task reads chunks from a JSON file (default: API/docs/chunks.json) and ingests them
+    into the vector database for later retrieval during interrogation. Each chunk contains
+    legal text with metadata (law_name, article, article_number, source_file).
+
+    Args:
+        chunks_file_path (str, optional): Path to the JSON file containing law chunks.
+            Defaults to '/app/API/docs/chunks.json' in Docker or 'API/docs/chunks.json' locally.
+
+    Returns:
+        dict: JSON response indicating ingestion status.
+
+        **Success Response:**
+        ```json
+        {
+            "status": "SUCCESS",
+            "task_id": "<celery_task_id>",
+            "message": "Law chunks ingested successfully",
+            "data": {
+                "chunks_count": 100
+            }
+        }
+        ```
+
+        **Failure Response:**
+        ```json
+        {
+            "status": "FAILURE",
+            "task_id": "<celery_task_id>",
+            "message": "Failed to ingest law chunks: <error_message>"
+        }
+        ```
+    """
+    import json
+    from langchain_core.documents import Document
+    
+    logger.debug(f"Task started: ingest_law_chunks - chunks_file_path: {chunks_file_path}")
+    
+    try:
+        from Archivist import Archivist
+        from Archivist.indexers import VectorDBIndexer
+        
+        # Default path - check both Docker and local paths
+        if chunks_file_path is None:
+            # Try Docker path first, then local path
+            docker_path = '/app/API/docs/chunks.json'
+            local_path = os.path.join(os.path.dirname(__file__), 'docs', 'chunks.json')
+            
+            if os.path.exists(docker_path):
+                chunks_file_path = docker_path
+            elif os.path.exists(local_path):
+                chunks_file_path = local_path
+            else:
+                raise FileNotFoundError(f"Chunks file not found at {docker_path} or {local_path}")
+        
+        logger.info(f"Loading law chunks from: {chunks_file_path}")
+        
+        # Load chunks from JSON file
+        with open(chunks_file_path, 'r', encoding='utf-8') as f:
+            chunks_data = json.load(f)
+        
+        logger.info(f"Loaded {len(chunks_data)} chunks from file")
+        
+        # Convert chunks to LangChain Documents
+        documents = []
+        for chunk in chunks_data:
+            content = chunk.get('content', '')
+            metadata = chunk.get('metadata', {})
+            
+            # Add source type to distinguish law documents from user documents
+            metadata['source_type'] = 'law_reference'
+            
+            doc = Document(page_content=content, metadata=metadata)
+            documents.append(doc)
+        
+        logger.info(f"Converted {len(documents)} chunks to Documents")
+        
+        # Initialize VectorDB indexer and ingest documents
+        # Note: We initialize a new indexer to ensure we're using the correct configuration
+        indexer = VectorDBIndexer()
+        
+        # Index the documents (this will add to the existing collection)
+        # We need to modify the index method to not delete all existing documents
+        indexer.index_without_delete(documents)
+        
+        logger.info(f"Successfully ingested {len(documents)} law chunks into vector database")
+        
+        return create_task_response(
+            status="SUCCESS",
+            task_id=self.request.id,
+            message="Law chunks ingested successfully",
+            data={"chunks_count": len(documents)}
+        )
+        
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=str(e)
+        )
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON format: {e}")
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=f"Invalid JSON format in chunks file: {e}"
+        )
+    except Exception as e:
+        logger.error(f"Error in ingest_law_chunks: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying... Attempt {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=5)
+
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=f"Failed to ingest law chunks: {e}"
+        )
+
 # Celery worker startup hook
 @celery_app.on_after_configure.connect
 def setup_worker_initialization(sender, **kwargs):

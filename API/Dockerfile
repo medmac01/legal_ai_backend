@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY API/requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 # Create directories for the packages
 RUN mkdir -p /app/packages/Archivist /app/packages/Researcher /app/packages/Interrogator
@@ -43,9 +43,9 @@ COPY Archivist/requirements.txt /app/packages/Archivist/requirements.txt
 
 # Install dependencies separately (cached unless requirements.txt changes)
 # This is the slow part - will be cached if requirements don't change
-RUN pip install --no-cache-dir -r /app/packages/Researcher/requirements.txt
-RUN pip install --no-cache-dir -r /app/packages/Interrogator/requirements.txt
-RUN pip install --no-cache-dir -r /app/packages/Archivist/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r /app/packages/Researcher/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r /app/packages/Interrogator/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r /app/packages/Archivist/requirements.txt
 
 # Now copy the actual package code (changes frequently, but installs fast)
 COPY Researcher /app/packages/Researcher/

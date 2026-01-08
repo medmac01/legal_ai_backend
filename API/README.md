@@ -217,6 +217,53 @@ curl -X POST "http://localhost:5001/index/document/" \
 
 **Supported Formats**: `.pdf`, `.docx`, `.txt`
 
+#### POST `/ingest/law-chunks/`
+Ingest pre-chunked law data from a JSON file into the vector database for legal reference during contract auditing.
+
+**Request Body** (`IngestLawChunksRequest`):
+```json
+{
+  "chunks_file_path": "/path/to/chunks.json"
+}
+```
+
+**Note**: The `chunks_file_path` is optional. If not provided, the system will look for chunks in:
+1. Environment variable `LAW_CHUNKS_FILE_PATH`
+2. Default Docker path: `/app/API/docs/chunks.json`
+3. Default local path: `API/docs/chunks.json`
+
+**Response**:
+```json
+{
+  "message": "Law chunks ingestion started",
+  "statusCode": 202,
+  "data": {
+    "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+}
+```
+
+**Chunks JSON Format**:
+```json
+[
+  {
+    "content": "Legal text content of the article...",
+    "metadata": {
+      "law_name": "Law 09-08",
+      "chunk_type": "article",
+      "article": "Article 1",
+      "article_number": "1",
+      "source_file": "09_08.pdf"
+    }
+  }
+]
+```
+
+**Workflow for Contract Auditing**:
+1. Ingest law chunks using `/ingest/law-chunks/` (one-time setup)
+2. Index user contracts using `/index/document/`
+3. Use `/interrogation/` to audit contracts - the system will cross-reference with ingested laws
+
 ### ✍️ NDA Generator
 
 #### POST `/nda/generate`

@@ -81,10 +81,8 @@ class TestAdalaRetriever(unittest.TestCase):
 
         retriever = AdalaRetriever()
         
-        # Run async search
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        results = loop.run_until_complete(retriever._async_search("test", 5))
+        # Run async search using asyncio.run()
+        results = asyncio.run(retriever._async_search("test", 5))
         
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["title"], "Test Law")

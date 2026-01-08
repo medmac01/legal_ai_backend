@@ -199,19 +199,15 @@ class AdalaRetriever(BaseRetriever):
 
             # Handle async search in sync context
             try:
+                # Try to get the current event loop
                 loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If loop is already running, create a new one
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    search_results = loop.run_until_complete(self._async_search(query, max_results))
-                else:
-                    search_results = loop.run_until_complete(self._async_search(query, max_results))
             except RuntimeError:
-                # Fallback: create new event loop
+                # No event loop, create a new one
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                search_results = loop.run_until_complete(self._async_search(query, max_results))
+            
+            # Run the async search
+            search_results = asyncio.run(self._async_search(query, max_results))
 
             logger.info("Successfully retrieved %d Adala documents", len(search_results))
 

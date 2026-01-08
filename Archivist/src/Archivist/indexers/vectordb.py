@@ -157,6 +157,38 @@ class VectorDBIndexer(BaseIndexer):
             logger.error("Error indexing documents to %s: %s", self.vector_store_type, str(e))
             logger.debug(traceback.format_exc())
 
+    def index_without_delete(self, docs: List[Document], **kwargs) -> None:
+        """
+        Index (upsert) documents into the selected vector store without deleting existing documents.
+
+        This method is useful for adding new documents (like law reference chunks) to an existing
+        collection without removing previously indexed documents.
+
+        Args:
+            docs (List[Document]): A list of LangChain Document objects to be indexed.
+            **kwargs: Additional parameters, e.g., chunk_size.
+        """
+        try:
+            logger.info("Indexing %d documents into %s (without deleting existing)...", len(docs), self.vector_store_type)
+
+            if self.vector_store_type == "pinecone":
+                from langchain_pinecone import PineconeVectorStore
+                # Create vectorstore instance connected to existing index and add documents
+                vectorstore = PineconeVectorStore(
+                    index_name=self.index_name,
+                    embedding=self.embeddings,
+                )
+                # Add documents to the existing index (upsert operation)
+                vectorstore.add_documents(docs)
+            elif self.vector_store_type == "chroma":
+                self.db.add_documents(docs)
+
+            logger.info("Successfully indexed %d documents into %s (Index Name: %s)", len(docs), self.vector_store_type, self.index_name)
+
+        except Exception as e:
+            logger.error("Error indexing documents to %s: %s", self.vector_store_type, str(e))
+            logger.debug(traceback.format_exc())
+
     def delete_all(self) -> None:
         """
         Deletes all documents stored in the selected vector database.

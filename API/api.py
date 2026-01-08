@@ -568,6 +568,62 @@ async def interrogation(
     )
     return create_response("Interrogation operation started", 202, {"task_id": task.id})
 
+class IngestLawChunksRequest(BaseModel):
+    """
+    Request PAKTON to ingest pre-chunked law data into the vector database.
+    """
+    chunks_file_path: Optional[str] = None
+
+@app.post("/ingest/law-chunks/", tags=["Archivist Operations"])
+async def ingest_law_chunks(
+    request: IngestLawChunksRequest = IngestLawChunksRequest(),
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Ingest pre-chunked law data into the vector database**
+
+    This endpoint ingests pre-chunked legal law data from a JSON file into the vector database.
+    The law chunks are used as reference material when auditing user-provided contracts.
+    Requires authentication.
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Parameters:**
+    - `chunks_file_path`: Optional path to the JSON file containing law chunks.
+      Defaults to 'API/docs/chunks.json' in Docker or locally.
+
+    **Response:**
+    - Returns a **task_id** that can be used to track the ingestion operation.
+
+    **Chunks JSON Format:**
+    The JSON file should contain an array of objects with the following structure:
+    ```json
+    [
+        {
+            "content": "Legal text content...",
+            "metadata": {
+                "law_name": "Law 09-08",
+                "chunk_type": "article",
+                "article": "Article 1",
+                "article_number": "1",
+                "source_file": "09_08.pdf"
+            }
+        }
+    ]
+    ```
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"Ingest law chunks request - User: {user_info}")
+    
+    task = celery_app.send_task(
+        f'{Config.SERVICE_NAME}.tasks.ingest_law_chunks',
+        args=[request.chunks_file_path],
+        queue=Config.SERVICE_QUEUE
+    )
+    return create_response("Law chunks ingestion started", 202, {"task_id": task.id})
+
 @app.get("/task_status/{task_id}", tags=["Task Management"])
 async def get_task_status(
     task_id: str,

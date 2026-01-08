@@ -38,12 +38,32 @@ class VectorDBIndexer(BaseIndexer):
             if not self.vector_store_type:
                 raise ValueError("vector_store is required but not set in environment or config.")
             
-            # Initialize embedding model
-            embedding_model = self.vectordb_config.get("embedding_model", "text-embedding-3-large")
-            embeddings_api_key = os.environ.get("EMBEDDINGS_API_KEY")
-            if not embeddings_api_key:
-                raise ValueError("EMBEDDINGS_API_KEY is required but not set in environment or config.")
-            self.embeddings = OpenAIEmbeddings(model=embedding_model, openai_api_key=embeddings_api_key)
+            # Initialize embedding model (supports API, local, and Ollama)
+            embedding_type = self.vectordb_config.get("embedding_type", "openai").lower()
+            
+            if embedding_type == "ollama":
+                # Use Ollama embeddings (local server)
+                from langchain_community.embeddings import OllamaEmbeddings
+                embedding_model = self.vectordb_config.get("embedding_model", "embeddinggemma:latest")
+                ollama_base_url = self.vectordb_config.get("ollama_base_url", "http://host.docker.internal:11434")
+                logger.info(f"Using Ollama embeddings: {embedding_model} at {ollama_base_url}")
+                self.embeddings = OllamaEmbeddings(
+                    model=embedding_model,
+                    base_url=ollama_base_url
+                )
+            elif embedding_type == "local":
+                # Use local HuggingFace embeddings (no API key needed)
+                from langchain_huggingface import HuggingFaceEmbeddings
+                embedding_model = self.vectordb_config.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
+                logger.info(f"Using local embeddings: {embedding_model}")
+                self.embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
+            else:
+                # Use OpenAI embeddings (requires API key)
+                embedding_model = self.vectordb_config.get("embedding_model", "text-embedding-3-large")
+                embeddings_api_key = os.environ.get("EMBEDDINGS_API_KEY")
+                if not embeddings_api_key:
+                    raise ValueError("EMBEDDINGS_API_KEY is required for OpenAI embeddings. Set embedding_type: 'local' or 'ollama' in config to use local embeddings instead.")
+                self.embeddings = OpenAIEmbeddings(model=embedding_model, openai_api_key=embeddings_api_key)
 
             logger.info("Initializing VectorDBIndexer with vector store: %s", self.vector_store_type)
 

@@ -10,10 +10,18 @@
 # configuration for different indexers
 indexers:
 
-  # configuration for vector database indexers
+  # configuration for vector database indexers (used if enable_vectordb=True)
   vectordb:
     # indicate which vector store to use from the following
-    use_vector_store: "chroma" 
+    use_vector_store: "chroma"  # Options: "chroma" or "pinecone"
+    
+    # Embedding configuration
+    embedding_type: "ollama"  # "ollama" for Ollama, "local" for HuggingFace, "openai" for API
+    # Ollama settings (when embedding_type="ollama")
+    ollama_base_url: "http://host.docker.internal:11434"
+    embedding_model: "nomic-embed-text"  # Your Ollama model name
+    # For local HuggingFace: sentence-transformers/all-MiniLM-L6-v2 (384 dim, fast)
+    # For local HuggingFace: sentence-transformers/all-mpnet-base-v2 (768 dim, better)
 
     pinecone:
       INDEX_NAME: "test"
@@ -29,10 +37,13 @@ indexers:
         hnsw:search_ef: 1000
     # embedding_model: "text-embedding-ada-002"
     
+  # LightRAG configuration (used if enable_lightrag=True)
   lightrag:
-    base_url: "http://localhost:9621"
-    clear_existing: true
-    max_polling_time: 300
+    base_url: "http://lightrag:9621"  # LightRAG Docker service
+    clear_existing: true  # Clear existing docs before indexing new ones
+    max_polling_time: 300  # Max time to wait for indexing to complete (seconds)
+    polling_interval: 2  # Check status every N seconds
+    # Note: LightRAG uses Ollama from host machine (configured in docker-compose.yml)
 
 parser:
   # Indicate which type of the parser will be used, naive or structural

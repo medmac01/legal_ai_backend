@@ -27,6 +27,7 @@ llama-index==0.12.42
 openai==1.109.1
 cohere==5.20.0
 cohere-aws==0.8.18
+httpx
 
 # llama index dependencies
 llama-cloud==0.1.35

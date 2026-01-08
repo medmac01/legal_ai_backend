@@ -15,6 +15,7 @@ from .vectordb import VectorDBRetriever
 from .bm25 import BM25RetrieverWrapper
 from .hybrid import HybridRetriever
 from .lightrag import LightRAGRetriever
+from .adala import AdalaRetriever
 
 __all__ = [
     "BaseRetriever",
@@ -23,5 +24,6 @@ __all__ = [
     "VectorDBRetriever",
     "BM25RetrieverWrapper",
     "HybridRetriever",
-    "LightRAGRetriever"
+    "LightRAGRetriever",
+    "AdalaRetriever"
 ]

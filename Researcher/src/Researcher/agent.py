@@ -15,7 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 import time
 
 from Researcher.graph import GraphBuilder
-from Researcher.retrievers import WikipediaRetriever, WebRetriever, VectorDBRetriever, BM25RetrieverWrapper, HybridRetriever, LightRAGRetriever
+from Researcher.retrievers import WikipediaRetriever, WebRetriever, VectorDBRetriever, BM25RetrieverWrapper, HybridRetriever, LightRAGRetriever, AdalaRetriever
 
 from Researcher.utils import logger  # Import the logger
 
@@ -105,6 +105,16 @@ class Researcher:
                     logger.info("LightRAGRetriever added successfully.")
                 except Exception as e:
                     logger.error("Failed to initialize LightRAGRetriever: %s", str(e))
+                    logger.debug(traceback.format_exc())
+
+            # Adala retriever
+            if self.config.get("enable_adala", False):
+                try:
+                    adala_retriever = AdalaRetriever()
+                    self.graph_builder.add_retriever(adala_retriever.name, adala_retriever)
+                    logger.info("AdalaRetriever added successfully.")
+                except Exception as e:
+                    logger.error("Failed to initialize AdalaRetriever: %s", str(e))
                     logger.debug(traceback.format_exc())
 
         except Exception as e:

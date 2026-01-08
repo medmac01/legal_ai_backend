@@ -63,6 +63,11 @@ retrievers:
       max_relationships: 5        # Maximum number of relationships to include
       max_sources: 3              # Maximum number of sources to include
 
+  adala:
+    base_url: "https://adala.justice.gov.ma"
+    build_id: "THP5ZL1eNCinRAZ1hWfN0"  # May need updates if website is redeployed
+    max_results: 5
+
 reranking:
   use_reranker: False
   top_k: 64

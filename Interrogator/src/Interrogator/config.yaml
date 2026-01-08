@@ -20,7 +20,7 @@ models:
   default:
     API: "OPENAI" # OPENAI or BEDROCK or LOCAL or GOOGLE
     model_id: "gpt-oss:20b"
-    endpoint_url: "http://host.docker.internal:11434/v1"
+    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
     # "gemini-2.0-flash"
     # "meta-llama/Llama-3.3-70B-Instruct"
     # "meta-llama/Meta-Llama-3.1-8B-Instruct"
@@ -46,8 +46,9 @@ models:
 
   # Question Generator can use a specialized model
   question_generator:
-    API: "GOOGLE"
-    model_id: "gemma-3-27b-it"
+    API: "OPENAI"
+    model_id: "gpt-oss:20b"
+    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
     args:
       temperature: 0.5
       # max_tokens: 8192 # LLAMA 70 B REQUIRES 8192
@@ -57,8 +58,9 @@ models:
       
   # Report Generator can use a different model
   report_generator:
-    API: "GOOGLE"
-    model_id: "gemma-3-27b-it"
+    API: "OPENAI"
+    model_id: "gpt-oss:20b"
+    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
     args:
       temperature: 0.5
       # max_tokens: 8192
@@ -67,8 +69,9 @@ models:
     # endpoint_url: "https://api.deepseek.com" # set the base url to the deepseek api url
 
   write_conclusion:
-    API: "GOOGLE"
-    model_id: "gemma-3-27b-it"
+    API: "OPENAI"
+    model_id: "gpt-oss:20b"
+    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
     args:
       temperature: 0.5
       # max_tokens: 8192

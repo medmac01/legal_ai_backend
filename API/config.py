@@ -39,3 +39,9 @@ class Config:
     CELERY_RESULT_BACKEND = get_required_env("CELERY_RESULT_BACKEND")
     TASK_ROUTES = { f"{SERVICE_NAME}.tasks.*": {"queue": SERVICE_QUEUE} }
     ############################################################################
+
+    ############################# Law Chunks Configuration #####################
+    # Path to the JSON file containing pre-chunked law data for ingestion
+    # Can be overridden via environment variable LAW_CHUNKS_FILE_PATH
+    LAW_CHUNKS_FILE_PATH = os.getenv("LAW_CHUNKS_FILE_PATH", None)
+    ############################################################################

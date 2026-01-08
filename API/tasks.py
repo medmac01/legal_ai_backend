@@ -365,21 +365,27 @@ def async_ingest_law_chunks(self, chunks_file_path: str = None):
     logger.debug(f"Task started: ingest_law_chunks - chunks_file_path: {chunks_file_path}")
     
     try:
-        from Archivist import Archivist
         from Archivist.indexers import VectorDBIndexer
         
-        # Default path - check both Docker and local paths
+        # Use path from argument, config, or default locations
         if chunks_file_path is None:
-            # Try Docker path first, then local path
-            docker_path = '/app/API/docs/chunks.json'
-            local_path = os.path.join(os.path.dirname(__file__), 'docs', 'chunks.json')
+            # First check config/environment variable
+            chunks_file_path = Config.LAW_CHUNKS_FILE_PATH
+        
+        if chunks_file_path is None:
+            # Fall back to default paths - Docker path first, then local
+            default_docker_path = '/app/API/docs/chunks.json'
+            default_local_path = os.path.join(os.path.dirname(__file__), 'docs', 'chunks.json')
             
-            if os.path.exists(docker_path):
-                chunks_file_path = docker_path
-            elif os.path.exists(local_path):
-                chunks_file_path = local_path
+            if os.path.exists(default_docker_path):
+                chunks_file_path = default_docker_path
+            elif os.path.exists(default_local_path):
+                chunks_file_path = default_local_path
             else:
-                raise FileNotFoundError(f"Chunks file not found at {docker_path} or {local_path}")
+                raise FileNotFoundError(
+                    f"Chunks file not found. Set LAW_CHUNKS_FILE_PATH environment variable or "
+                    f"place file at {default_docker_path} (Docker) or {default_local_path} (local)"
+                )
         
         logger.info(f"Loading law chunks from: {chunks_file_path}")
         
@@ -403,12 +409,10 @@ def async_ingest_law_chunks(self, chunks_file_path: str = None):
         
         logger.info(f"Converted {len(documents)} chunks to Documents")
         
-        # Initialize VectorDB indexer and ingest documents
-        # Note: We initialize a new indexer to ensure we're using the correct configuration
+        # Initialize VectorDB indexer with the config from config.yaml
         indexer = VectorDBIndexer()
         
-        # Index the documents (this will add to the existing collection)
-        # We need to modify the index method to not delete all existing documents
+        # Add documents to existing collection without clearing previous data
         indexer.index_without_delete(documents)
         
         logger.info(f"Successfully ingested {len(documents)} law chunks into vector database")

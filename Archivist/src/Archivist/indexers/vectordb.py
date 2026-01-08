@@ -173,12 +173,13 @@ class VectorDBIndexer(BaseIndexer):
 
             if self.vector_store_type == "pinecone":
                 from langchain_pinecone import PineconeVectorStore
-                # Add documents to existing Pinecone index
-                vectorstore = PineconeVectorStore.from_documents(
-                    documents=docs,
-                    embedding=self.embeddings,
+                # Create vectorstore instance connected to existing index and add documents
+                vectorstore = PineconeVectorStore(
                     index_name=self.index_name,
+                    embedding=self.embeddings,
                 )
+                # Add documents to the existing index (upsert operation)
+                vectorstore.add_documents(docs)
             elif self.vector_store_type == "chroma":
                 self.db.add_documents(docs)
 

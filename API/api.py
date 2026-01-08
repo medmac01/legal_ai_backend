@@ -181,8 +181,14 @@ async def process_query_sse(
                 
                 logger.info(f"Query processed successfully - Result: {result}")
                 
-                # Track conversation in database if user is authenticated
+                # Track conversation in database (use anonymous email when auth is disabled)
+                user_email = None
                 if user and user.email:
+                    user_email = user.email
+                elif not Config.ENABLE_AUTHENTICATION:
+                    user_email = "anonymous@development.local"
+                
+                if user_email:
                     try:
                         thread_id = result["thread_id"]
                         
@@ -194,7 +200,7 @@ async def process_query_sse(
                             ConversationRepository.create(
                                 db=db,
                                 thread_id=thread_id,
-                                user_email=user.email,
+                                user_email=user_email,
                                 title=title
                             )
                         
@@ -207,7 +213,7 @@ async def process_query_sse(
                             message_count=message_count
                         )
                         
-                        logger.info(f"Conversation tracked for user {user.email}, thread {thread_id}")
+                        logger.info(f"Conversation tracked for user {user_email}, thread {thread_id}")
                     except Exception as db_error:
                         logger.error(f"Failed to track conversation: {str(db_error)}")
                         # Continue despite database error
@@ -349,8 +355,14 @@ async def process_query_stream_steps_sse(
                         }
                         yield f"data: {json.dumps(step_data)}\n\n"
                 
-                # Track conversation in database after streaming completes
-                if user and user.email and response_thread_id:
+                # Track conversation in database after streaming completes (use anonymous email when auth is disabled)
+                user_email = None
+                if user and user.email:
+                    user_email = user.email
+                elif not Config.ENABLE_AUTHENTICATION:
+                    user_email = "anonymous@development.local"
+                
+                if user_email and response_thread_id:
                     try:
                         # Get or create conversation
                         conversation = ConversationRepository.get_by_thread_id(db, response_thread_id)
@@ -360,7 +372,7 @@ async def process_query_stream_steps_sse(
                             ConversationRepository.create(
                                 db=db,
                                 thread_id=response_thread_id,
-                                user_email=user.email,
+                                user_email=user_email,
                                 title=title
                             )
                         
@@ -379,7 +391,7 @@ async def process_query_stream_steps_sse(
                             message_count=message_count
                         )
                         
-                        logger.info(f"Conversation tracked for user {user.email}, thread {response_thread_id}")
+                        logger.info(f"Conversation tracked for user {user_email}, thread {response_thread_id}")
                     except Exception as db_error:
                         logger.error(f"Failed to track conversation: {str(db_error)}")
                         # Continue despite database error
@@ -649,17 +661,23 @@ async def get_user_conversations(
     }
     ```
     """
-    if not user or not user.email:
+    # Use anonymous email when authentication is disabled
+    if user and user.email:
+        user_email = user.email
+        user_info = f"{user.email} ({user.user_id})"
+    elif not Config.ENABLE_AUTHENTICATION:
+        user_email = "anonymous@development.local"
+        user_info = "anonymous (auth disabled)"
+    else:
         return create_response("Authentication required", 401, {})
     
-    user_info = f"{user.email} ({user.user_id})"
     logger.info(f"Fetching conversations for user: {user_info}")
     
     try:
         conversations = ConversationRepository.get_by_user_email(
-            db, user.email, limit=limit, offset=offset
+            db, user_email, limit=limit, offset=offset
         )
-        total = ConversationRepository.count_by_user(db, user.email)
+        total = ConversationRepository.count_by_user(db, user_email)
         
         return create_response(
             "Conversations retrieved successfully",
@@ -706,10 +724,15 @@ async def get_conversation(
     }
     ```
     """
-    if not user or not user.email:
+    # Use anonymous email when authentication is disabled
+    if user and user.email:
+        user_email = user.email
+    elif not Config.ENABLE_AUTHENTICATION:
+        user_email = "anonymous@development.local"
+    else:
         return create_response("Authentication required", 401, {})
     
-    logger.info(f"Fetching conversation {thread_id} for user {user.email}")
+    logger.info(f"Fetching conversation {thread_id} for user {user_email}")
     
     try:
         conversation = ConversationRepository.get_by_thread_id(db, thread_id)
@@ -717,8 +740,8 @@ async def get_conversation(
         if not conversation:
             return create_response("Conversation not found", 404, {})
         
-        # Verify the conversation belongs to the user
-        if conversation.user_email != user.email:
+        # Verify the conversation belongs to the user (skip check if auth disabled)
+        if Config.ENABLE_AUTHENTICATION and conversation.user_email != user_email:
             return create_response("Access denied", 403, {})
         
         return create_response(
@@ -768,10 +791,15 @@ async def get_conversation_messages(
     }
     ```
     """
-    if not user or not user.email:
+    # Use anonymous email when authentication is disabled
+    if user and user.email:
+        user_email = user.email
+    elif not Config.ENABLE_AUTHENTICATION:
+        user_email = "anonymous@development.local"
+    else:
         return create_response("Authentication required", 401, {})
     
-    logger.info(f"Fetching conversation messages for thread {thread_id}, user {user.email}")
+    logger.info(f"Fetching conversation messages for thread {thread_id}, user {user_email}")
     
     try:
         # First verify the conversation exists and belongs to the user
@@ -780,8 +808,8 @@ async def get_conversation_messages(
         if not conversation:
             return create_response("Conversation not found", 404, {})
         
-        # Verify the conversation belongs to the user
-        if conversation.user_email != user.email:
+        # Verify the conversation belongs to the user (skip check if auth disabled)
+        if Config.ENABLE_AUTHENTICATION and conversation.user_email != user_email:
             return create_response("Access denied", 403, {})
         
         # Get the conversation messages from Archivist checkpointer
@@ -834,10 +862,15 @@ async def delete_conversation(
     }
     ```
     """
-    if not user or not user.email:
+    # Use anonymous email when authentication is disabled
+    if user and user.email:
+        user_email = user.email
+    elif not Config.ENABLE_AUTHENTICATION:
+        user_email = "anonymous@development.local"
+    else:
         return create_response("Authentication required", 401, {})
     
-    logger.info(f"Deleting conversation {thread_id} for user {user.email}")
+    logger.info(f"Deleting conversation {thread_id} for user {user_email}")
     
     try:
         conversation = ConversationRepository.get_by_thread_id(db, thread_id)
@@ -845,8 +878,8 @@ async def delete_conversation(
         if not conversation:
             return create_response("Conversation not found", 404, {})
         
-        # Verify the conversation belongs to the user
-        if conversation.user_email != user.email:
+        # Verify the conversation belongs to the user (skip check if auth disabled)
+        if Config.ENABLE_AUTHENTICATION and conversation.user_email != user_email:
             return create_response("Access denied", 403, {})
         
         ConversationRepository.delete(db, thread_id)

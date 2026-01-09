@@ -1256,6 +1256,187 @@ async def modify_nda(
 
 # ==================== End of NDA Generator Endpoints ====================
 
+# ==================== Contract Audit Endpoints ====================
+
+class ContractAuditRequest(BaseModel):
+    """
+    Request model for contract audit operations.
+    """
+    generate_summary: bool = True  # Whether to generate executive summary
+
+
+@app.post("/contract/audit", tags=["Contract Audit"])
+async def audit_contract(
+    file: UploadFile = File(...),
+    generate_summary: bool = Form(True),
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Audit a Contract Against Moroccan Law (Full Analysis)**
+
+    This endpoint performs a comprehensive clause-by-clause audit of a contract
+    against Moroccan law. It analyzes each clause individually and provides
+    detailed compliance findings.
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header (if enabled)
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Format:** `multipart/form-data`
+
+    **Parameters:**
+    - `file` (File): The contract document to audit (PDF, DOCX, or TXT)
+    - `generate_summary` (Form field): Whether to generate an executive summary (default: true)
+
+    **Supported File Types:**
+    - PDF (.pdf)
+    - Word Document (.docx)
+    - Plain Text (.txt)
+
+    **Response:**
+    - Returns a **task_id** that can be used to track the audit operation.
+
+    **Example Response:**
+    ```json
+    {
+        "message": "Contract audit started",
+        "statusCode": 202,
+        "data": {
+            "task_id": "abc123..."
+        }
+    }
+    ```
+
+    **Task Result Structure (when complete):**
+    The task result will contain:
+    - `report`: Full audit report with findings
+    - `markdown_report`: Human-readable Markdown formatted report
+    - `json_report`: Machine-readable JSON formatted report
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"Contract audit request - User: {user_info}, File: {file.filename}")
+    
+    try:
+        # Validate file type
+        filename = file.filename or "unknown"
+        file_extension = filename.lower().split('.')[-1] if '.' in filename else ''
+        
+        if file_extension not in ['pdf', 'docx', 'txt']:
+            return create_response(
+                "Unsupported file type", 
+                400, 
+                {"error": f"File type '.{file_extension}' is not supported. Use PDF, DOCX, or TXT."}
+            )
+        
+        # Read file content
+        file_content = await file.read()
+        
+        if not file_content:
+            return create_response("Empty file", 400, {"error": "The uploaded file is empty."})
+        
+        # Send task to Celery
+        task = celery_app.send_task(
+            f'{Config.SERVICE_NAME}.tasks.contract_audit',
+            args=[file_content, filename, generate_summary],
+            queue=Config.SERVICE_QUEUE
+        )
+        
+        logger.info(f"Contract audit task created: {task.id}")
+        return create_response("Contract audit started", 202, {"task_id": task.id})
+        
+    except Exception as e:
+        logger.error(f"Error starting contract audit: {str(e)}")
+        return create_response("Failed to start contract audit", 500, {"error": str(e)})
+
+
+@app.post("/contract/audit/quick", tags=["Contract Audit"])
+async def quick_audit_contract(
+    file: UploadFile = File(...),
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Quick Contract Audit (Rapid Assessment)**
+
+    This endpoint performs a quick, high-level assessment of a contract
+    against Moroccan law. It provides a faster analysis without detailed
+    clause-by-clause breakdown.
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header (if enabled)
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Format:** `multipart/form-data`
+
+    **Parameters:**
+    - `file` (File): The contract document to audit (PDF, DOCX, or TXT)
+
+    **Supported File Types:**
+    - PDF (.pdf)
+    - Word Document (.docx)
+    - Plain Text (.txt)
+
+    **Response:**
+    - Returns a **task_id** that can be used to track the audit operation.
+
+    **Example Response:**
+    ```json
+    {
+        "message": "Quick contract audit started",
+        "statusCode": 202,
+        "data": {
+            "task_id": "abc123..."
+        }
+    }
+    ```
+
+    **Task Result Structure (when complete):**
+    The task result will contain:
+    - `assessment`: Quick audit assessment results
+    - `markdown_report`: Human-readable Markdown formatted report
+
+    **Use Case:**
+    Use this endpoint when you need:
+    - Rapid initial assessment of a contract
+    - Overview of potential issues before detailed review
+    - Quick compliance check for simple contracts
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"Quick contract audit request - User: {user_info}, File: {file.filename}")
+    
+    try:
+        # Validate file type
+        filename = file.filename or "unknown"
+        file_extension = filename.lower().split('.')[-1] if '.' in filename else ''
+        
+        if file_extension not in ['pdf', 'docx', 'txt']:
+            return create_response(
+                "Unsupported file type", 
+                400, 
+                {"error": f"File type '.{file_extension}' is not supported. Use PDF, DOCX, or TXT."}
+            )
+        
+        # Read file content
+        file_content = await file.read()
+        
+        if not file_content:
+            return create_response("Empty file", 400, {"error": "The uploaded file is empty."})
+        
+        # Send task to Celery
+        task = celery_app.send_task(
+            f'{Config.SERVICE_NAME}.tasks.contract_audit_quick',
+            args=[file_content, filename],
+            queue=Config.SERVICE_QUEUE
+        )
+        
+        logger.info(f"Quick contract audit task created: {task.id}")
+        return create_response("Quick contract audit started", 202, {"task_id": task.id})
+        
+    except Exception as e:
+        logger.error(f"Error starting quick contract audit: {str(e)}")
+        return create_response("Failed to start quick contract audit", 500, {"error": str(e)})
+
+# ==================== End of Contract Audit Endpoints ====================
+
 @app.get("/health", tags=["Health Check"])
 def health_check():
     """

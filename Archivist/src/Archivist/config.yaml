@@ -18,8 +18,8 @@ indexers:
     # Embedding configuration
     embedding_type: "ollama"  # "ollama" for Ollama, "local" for HuggingFace, "openai" for API
     # Ollama settings (when embedding_type="ollama")
-    ollama_base_url: "http://host.docker.internal:11434"
-    embedding_model: "nomic-embed-text"  # Your Ollama model name
+    ollama_base_url: "https://4ff035f7dc21.ngrok-free.app/v1"
+    embedding_model: "embeddinggemma:latest"  # Your Ollama model name
     # For local HuggingFace: sentence-transformers/all-MiniLM-L6-v2 (384 dim, fast)
     # For local HuggingFace: sentence-transformers/all-mpnet-base-v2 (768 dim, better)
 

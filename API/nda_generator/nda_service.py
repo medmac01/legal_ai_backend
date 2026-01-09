@@ -1,7 +1,7 @@
 """
 Description: 
     NDA Generator Service for generating Non-Disclosure Agreements.
-    Uses Jinja2 templates for initial NDA generation and Google Gemini API
+    Uses Jinja2 templates for initial NDA generation and Ollama (OpenAI-compatible API)
     for NDA modification/customization.
     
 Author: Adapted from Streamlit app for FastAPI
@@ -14,7 +14,8 @@ from datetime import date
 from io import BytesIO
 from typing import Optional, Tuple, List, Dict, Any
 
-import google.generativeai as genai
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from docx import Document
 
 from .j2_engine import render_template
@@ -40,46 +41,40 @@ Your role is to act as a silent, precise editing tool. The user provides an inst
 class NDAService:
     """
     Service class for generating Non-Disclosure Agreements.
-    Uses Jinja2 templates for initial generation and Google Gemini API for modifications.
+    Uses Jinja2 templates for initial generation and Ollama (OpenAI-compatible API) for modifications.
     """
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, base_url: Optional[str] = None, model_id: Optional[str] = None):
         """
         Initialize the NDA Service.
         
         Args:
-            api_key: Optional Gemini API key. If not provided, will try to get from environment.
-                     API key is only required for modification features, not for template-based generation.
+            base_url: Optional Ollama base URL. If not provided, will try to get from LLM_BASE_URL 
+                      environment variable, defaults to http://localhost:11434/v1.
+            model_id: Optional model ID. If not provided, will try to get from LLM_MODEL_ID 
+                      environment variable, defaults to llama3.1:8b.
         """
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.base_url = base_url or os.getenv("LLM_BASE_URL", "https://4ff035f7dc21.ngrok-free.app/v1")
+        self.model_id = model_id or os.getenv("LLM_MODEL_ID", "gpt-oss:20b")
         self.model = None
         
-        # Only initialize Gemini if API key is available (for modification features)
-        if self.api_key:
-            try:
-                genai.configure(api_key=self.api_key)
-                
-                # Set up the model generation configuration
-                self.generation_config = {
-                    "temperature": 0.2,
-                    "top_p": 1,
-                    "top_k": 1,
-                    "max_output_tokens": 8192,
-                }
-                
-                # Initialize the Generative Model with system instruction for modifications
-                self.model = genai.GenerativeModel(
-                    model_name="gemini-2.5-flash-lite-preview-06-17",
-                    generation_config=self.generation_config,
-                    system_instruction=CHAT_SYSTEM_PROMPT
-                )
-                
-                logger.info("NDAService initialized with Gemini API for modifications")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Gemini API: {e}. Modification features will be unavailable.")
-                self.model = None
-        else:
-            logger.info("NDAService initialized without Gemini API (template-based generation only)")
+        # Initialize the LLM for modification features
+        try:
+            # OpenAI API key is required by the client but ignored by Ollama
+            api_key = os.getenv("OPENAI_API_KEY", "ollama")
+            
+            self.model = ChatOpenAI(
+                model_name=self.model_id,
+                openai_api_key=api_key,
+                base_url=self.base_url,
+                temperature=0.2,
+                max_tokens=8192,
+            )
+            
+            logger.info(f"NDAService initialized with Ollama API (base_url={self.base_url}, model={self.model_id}) for modifications")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Ollama LLM: {e}. Modification features will be unavailable.")
+            self.model = None
     
     def generate_nda_text(self, user_inputs: dict) -> str:
         """
@@ -132,44 +127,50 @@ class NDAService:
     def modify_nda(self, nda_text: str, modification_request: str, 
                    conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
         """
-        Modify an existing NDA using Google Gemini API.
+        Modify an existing NDA using Ollama (OpenAI-compatible API).
         
         Args:
             nda_text: The current NDA text to modify.
             modification_request: User's request for how to modify the NDA.
             conversation_history: Optional list of previous conversation messages
-                                  for context. Each message is a dict with 'role' and 'parts' keys.
+                                  for context. Each message is a dict with 'role' and 'content' keys.
         
         Returns:
             Modified NDA text as a string.
         
         Raises:
-            ValueError: If Gemini API is not available.
-            Exception: If Gemini API call fails.
+            ValueError: If Ollama LLM is not available.
+            Exception: If LLM API call fails.
         """
         if not self.model:
-            raise ValueError("Gemini API is not available. Please provide GEMINI_API_KEY to enable modification features.")
+            raise ValueError("Ollama LLM is not available. Please check LLM_BASE_URL and LLM_MODEL_ID configuration.")
         
-        # Build conversation history if provided
-        history = []
+        # Build messages list
+        messages = [SystemMessage(content=CHAT_SYSTEM_PROMPT)]
+        
         if conversation_history:
-            history = conversation_history
+            # Convert conversation history to LangChain message format
+            for msg in conversation_history:
+                role = msg.get("role", "")
+                content = msg.get("content", "") or msg.get("parts", [""])[0]  # Support both formats
+                if role == "user":
+                    messages.append(HumanMessage(content=content))
+                elif role in ("assistant", "model"):
+                    messages.append(AIMessage(content=content))
         else:
-            # Initialize with the current NDA as the first model response
-            history = [
-                {"role": "user", "parts": ["Please review this NDA."]},
-                {"role": "model", "parts": [nda_text]}
-            ]
+            # Initialize with the current NDA as context
+            messages.append(HumanMessage(content="Please review this NDA."))
+            messages.append(AIMessage(content=nda_text))
+        
+        # Add the modification request
+        messages.append(HumanMessage(content=modification_request))
         
         logger.info(f"Modifying NDA with request: {modification_request[:100]}...")
         
         try:
-            # Start a chat session with history
-            chat_session = self.model.start_chat(history=history)
-            
-            # Send the modification request
-            response = chat_session.send_message(modification_request)
-            modified_text = response.text
+            # Invoke the model
+            response = self.model.invoke(messages)
+            modified_text = response.content
             
             logger.info("NDA modified successfully")
             return modified_text

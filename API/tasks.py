@@ -452,6 +452,189 @@ def async_ingest_law_chunks(self, chunks_file_path: str = None):
             message=f"Failed to ingest law chunks: {e}"
         )
 
+# ==================== Contract Audit Tasks ====================
+
+@celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.contract_audit', bind=True, default_retry_delay=5, max_retries=3)
+def async_contract_audit(self, file_content: bytes, filename: str, generate_summary: bool = True):
+    """
+    Asynchronous full contract audit with clause-by-clause analysis.
+
+    Args:
+        file_content (bytes): The binary content of the contract document.
+        filename (str): The name of the file (used for type detection).
+        generate_summary (bool): Whether to generate an executive summary.
+
+    Returns:
+        dict: JSON response with audit results.
+
+        **Success Response:**
+        ```json
+        {
+            "status": "SUCCESS",
+            "task_id": "<celery_task_id>",
+            "message": "Contract audit completed",
+            "data": {
+                "report": {...},
+                "markdown_report": "...",
+                "json_report": "..."
+            }
+        }
+        ```
+
+        **Failure Response:**
+        ```json
+        {
+            "status": "FAILURE",
+            "task_id": "<celery_task_id>",
+            "message": "Failed to audit contract: <error_message>"
+        }
+        ```
+    """
+    logger.debug(f"Task started: contract_audit - filename: {filename}")
+    
+    try:
+        from .contract_audit import AuditService, ReportGenerator
+        
+        # Initialize audit service
+        audit_service = AuditService()
+        
+        # Perform audit
+        report = audit_service.audit_contract(
+            file_content=file_content,
+            filename=filename,
+            generate_summary=generate_summary
+        )
+        
+        # Convert report to dictionary
+        report_dict = report.to_dict()
+        
+        # Generate formatted reports
+        report_generator = ReportGenerator()
+        markdown_report = report_generator.generate_markdown_report(report_dict)
+        json_report = report_generator.generate_json_report(report_dict)
+        
+        logger.info(f"Contract audit completed for: {filename}")
+        
+        return create_task_response(
+            status="SUCCESS",
+            task_id=self.request.id,
+            message="Contract audit completed",
+            data={
+                "report": report_dict,
+                "markdown_report": markdown_report,
+                "json_report": json_report
+            }
+        )
+        
+    except ValueError as ve:
+        logger.error(f"Validation error in contract audit: {ve}")
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=str(ve)
+        )
+    except Exception as e:
+        logger.error(f"Error in contract_audit: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying... Attempt {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=5)
+
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=f"Failed to audit contract: {e}"
+        )
+
+
+@celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.contract_audit_quick', bind=True, default_retry_delay=5, max_retries=3)
+def async_contract_audit_quick(self, file_content: bytes, filename: str):
+    """
+    Asynchronous quick contract audit for rapid assessment.
+
+    Args:
+        file_content (bytes): The binary content of the contract document.
+        filename (str): The name of the file (used for type detection).
+
+    Returns:
+        dict: JSON response with quick audit results.
+
+        **Success Response:**
+        ```json
+        {
+            "status": "SUCCESS",
+            "task_id": "<celery_task_id>",
+            "message": "Quick contract audit completed",
+            "data": {
+                "assessment": {...},
+                "markdown_report": "..."
+            }
+        }
+        ```
+
+        **Failure Response:**
+        ```json
+        {
+            "status": "FAILURE",
+            "task_id": "<celery_task_id>",
+            "message": "Failed to perform quick audit: <error_message>"
+        }
+        ```
+    """
+    logger.debug(f"Task started: contract_audit_quick - filename: {filename}")
+    
+    try:
+        from .contract_audit import AuditService, ReportGenerator
+        
+        # Initialize audit service
+        audit_service = AuditService()
+        
+        # Perform quick audit
+        quick_result = audit_service.quick_audit(
+            file_content=file_content,
+            filename=filename
+        )
+        
+        # Generate markdown report
+        report_generator = ReportGenerator()
+        markdown_report = report_generator.generate_quick_audit_markdown(quick_result)
+        
+        logger.info(f"Quick contract audit completed for: {filename}")
+        
+        return create_task_response(
+            status="SUCCESS",
+            task_id=self.request.id,
+            message="Quick contract audit completed",
+            data={
+                "assessment": quick_result,
+                "markdown_report": markdown_report
+            }
+        )
+        
+    except ValueError as ve:
+        logger.error(f"Validation error in quick contract audit: {ve}")
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=str(ve)
+        )
+    except Exception as e:
+        logger.error(f"Error in contract_audit_quick: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying... Attempt {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=5)
+
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=f"Failed to perform quick audit: {e}"
+        )
+
+# ==================== End of Contract Audit Tasks ====================
+
 # Celery worker startup hook
 @celery_app.on_after_configure.connect
 def setup_worker_initialization(sender, **kwargs):

@@ -12,6 +12,9 @@ import logging
 from typing import Optional
 from io import BytesIO
 
+import fitz  # PyMuPDF
+from docx import Document
+
 logger = logging.getLogger(__name__)
 
 
@@ -77,8 +80,6 @@ class ContractParser:
         Returns:
             Extracted text content
         """
-        import fitz  # PyMuPDF
-        
         text_parts = []
         
         # Open PDF from bytes
@@ -105,8 +106,6 @@ class ContractParser:
         Returns:
             Extracted text content
         """
-        from docx import Document
-        
         doc = Document(BytesIO(file_content))
         text_parts = []
         

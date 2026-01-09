@@ -13,6 +13,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
+import requests
+
 from .contract_parser import ContractParser
 from .clause_extractor import ClauseExtractor, Clause
 from .law_retriever import LawRetriever
@@ -225,8 +227,6 @@ class AuditService:
         Returns:
             Generated text response
         """
-        import requests
-        
         url = f"{self.ollama_base_url}/api/generate"
         
         payload = {

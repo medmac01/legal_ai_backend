@@ -604,7 +604,7 @@ async def explain_contract(
     user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
     logger.info(f"Contract explanation request - User: {user_info}, Has question: {bool(request.question)}")
     
-    if not request.contract_text or not request.contract_text.strip():
+    if not request.contract_text.strip():
         return create_response("Contract text is required", 400, {"error": "contract_text cannot be empty"})
     
     try:

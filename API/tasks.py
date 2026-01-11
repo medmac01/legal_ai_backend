@@ -216,13 +216,15 @@ def async_explain_contract(self, contract_text: str, question: str = None, confi
         
         explanation = ""
         if isinstance(result, dict):
-            try:
-                explanation = result["response"]["messages"][-1].content
-            except Exception:
-                try:
-                    explanation = result.get("response", {}).get("messages", [])[-1].get("content", "")
-                except Exception:
-                    explanation = ""
+            messages = result.get("response", {}).get("messages", [])
+            if messages:
+                last_message = messages[-1]
+                if hasattr(last_message, "content"):
+                    explanation = last_message.content
+                elif isinstance(last_message, dict):
+                    explanation = last_message.get("content", "")
+                else:
+                    explanation = str(last_message)
         
         return create_task_response(
             status="SUCCESS",

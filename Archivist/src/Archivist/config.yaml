@@ -16,10 +16,10 @@ indexers:
     use_vector_store: "chroma"  # Options: "chroma" or "pinecone"
     
     # Embedding configuration
-    embedding_type: "ollama"  # "ollama" for Ollama, "local" for HuggingFace, "openai" for API
+    embedding_type: "local"  # "ollama" for Ollama, "local" for HuggingFace, "openai" for API
     # Ollama settings (when embedding_type="ollama")
-    ollama_base_url: "https://4ff035f7dc21.ngrok-free.app/v1"
-    embedding_model: "embeddinggemma:latest"  # Your Ollama model name
+    ollama_base_url: "http://host.docker.internal:11434"
+    embedding_model: "sentence-transformers/all-MiniLM-L6-v2"  # Your Ollama model name
     # For local HuggingFace: sentence-transformers/all-MiniLM-L6-v2 (384 dim, fast)
     # For local HuggingFace: sentence-transformers/all-mpnet-base-v2 (768 dim, better)
 
@@ -62,7 +62,7 @@ parser:
 models:
   API: "OPENAI" # OPENAI or BEDROCK 
   model_id: "gpt-oss:20b"
-  endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
+  endpoint_url: "http://host.docker.internal:11434/v1"
   # "meta-llama/Llama-3.1-70B-Instruct"
   # "meta-llama/Meta-Llama-3.1-8B-Instruct"
   # "meta.llama3-1-8b-instruct-v1:0"

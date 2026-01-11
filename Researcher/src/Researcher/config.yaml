@@ -25,6 +25,9 @@ retrievers:
     top_k: 100
     similarity_threshold: 0
     use_vector_store: "chroma"
+    embedding_type: "local"  # Options: "openai", "ollama", "local"
+    embedding_model: "sentence-transformers/all-MiniLM-L6-v2"  # Model name for Ollama or HuggingFace
+    ollama_base_url: "http://host.docker.internal:11434/"  # Use ngrok URL if needed
     pinecone:
       INDEX_NAME: "test"
       API_HOST: "https://test-hwguc1i.svc.aped-4627-b74a.pinecone.io"
@@ -92,7 +95,7 @@ models:
   default:
     API: "OPENAI" # OPENAI or BEDROCK or LOCAL or GOOGLE
     model_id: "gpt-oss:20b"
-    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
+    endpoint_url: "http://host.docker.internal:11434/v1"
     # "meta.llama3-1-70b-instruct-v1:0"
     # "anthropic.claude-3-5-sonnet-20241022-v2:0"
     # "meta-llama/Meta-Llama-3.1-8B-Instruct"
@@ -118,7 +121,7 @@ models:
   query_extractor:
     API: "OPENAI"
     model_id: "gpt-oss:20b"
-    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
+    endpoint_url: "http://host.docker.internal:11434/v1"
     args:
       temperature: 0
       # max_tokens: 8192
@@ -130,7 +133,7 @@ models:
   response_generator:
     API: "OPENAI"
     model_id: "gpt-oss:20b"
-    endpoint_url: "https://4ff035f7dc21.ngrok-free.app/v1"
+    endpoint_url: "http://host.docker.internal:11434/v1"
     args:
       temperature: 0
       # max_tokens: 8192

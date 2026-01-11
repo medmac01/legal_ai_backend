@@ -609,6 +609,14 @@ async def explain_contract(
     if not request.contract_text.strip():
         return create_response("Contract text is required", 400, {"error": "contract_text cannot be empty"})
     
+    max_contract_length = 50000
+    if len(request.contract_text) > max_contract_length:
+        return create_response(
+            "Contract text too long",
+            400,
+            {"error": f"contract_text must be under {max_contract_length} characters"}
+        )
+    
     try:
         task = celery_app.send_task(
             f'{Config.SERVICE_NAME}.tasks.explain_contract',

@@ -81,9 +81,11 @@ class ContractParser:
             Extracted text content
         """
         text_parts = []
+        page_count = 0
         
         # Open PDF from bytes
         with fitz.open(stream=file_content, filetype="pdf") as doc:
+            page_count = len(doc)
             for page_num, page in enumerate(doc):
                 page_text = page.get_text()
                 if page_text.strip():
@@ -91,7 +93,7 @@ class ContractParser:
                     logger.debug(f"Extracted text from page {page_num + 1}")
         
         full_text = "\n\n".join(text_parts)
-        logger.info(f"Extracted {len(full_text)} characters from PDF ({len(doc)} pages)")
+        logger.info(f"Extracted {len(full_text)} characters from PDF ({page_count} pages)")
         
         return full_text
     

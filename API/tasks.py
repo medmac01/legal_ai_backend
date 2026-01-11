@@ -183,6 +183,67 @@ def async_process_query(self, query: str, thread_id: str = None, config: dict = 
             message=f"Failed to process query: {e}"
         )
 
+@celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.explain_contract', bind=True, default_retry_delay=5, max_retries=3)
+def async_explain_contract(self, contract_text: str, question: str = None, config: dict = None):
+    """
+    Provide a friendly legal explanation for a contract (or clause) and optionally
+    answer a user question about it.
+    """
+    logger.debug("Task started: async_explain_contract")
+    
+    try:
+        explanation_prompt = [
+            "You are a professional contract lawyer.",
+            "Explain the following contract text in clear, friendly language.",
+            "Highlight the key obligations, rights, and any notable risks.",
+        ]
+        
+        if question:
+            explanation_prompt.append(f"Answer the user's question as well: {question}")
+        else:
+            explanation_prompt.append("If no question is provided, give a concise explanation and practical takeaways.")
+        
+        composed_query = "\n".join(explanation_prompt) + f"\n\nContract text:\n{contract_text}"
+        
+        archivist = get_archivist()
+        task_config = config or {}
+        
+        async def explain_async():
+            async with archivist:
+                return await archivist.process_query(composed_query, None, task_config)
+        
+        result = asyncio.run(explain_async())
+        
+        messages = result.get('response', {}).get('messages', []) if isinstance(result, dict) else []
+        explanation = ""
+        if messages:
+            last_message = messages[-1]
+            explanation = getattr(last_message, 'content', "") or (last_message.get('content', "") if isinstance(last_message, dict) else str(last_message))
+        
+        return create_task_response(
+            status="SUCCESS",
+            task_id=self.request.id,
+            message="Contract explanation completed",
+            data={
+                "thread_id": result.get('thread_id') if isinstance(result, dict) else None,
+                "explanation": explanation
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in async_explain_contract: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying... Attempt {self.request.retries + 1}/{self.max_retries}")
+            raise self.retry(exc=e, countdown=5)
+        
+        return create_task_response(
+            status="FAILURE",
+            task_id=self.request.id,
+            message=f"Failed to explain contract: {e}"
+        )
+
 @celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.index_document', bind=True, default_retry_delay=5, max_retries=3)
 def async_index_document(self, file_content: bytes, metadata: dict):
     """

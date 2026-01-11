@@ -95,6 +95,88 @@ Provide a quick assessment covering:
 Be concise but thorough. Focus on the most important legal considerations.
 """
 
+CLAUSE_AUDIT_ENHANCED = """
+You are a legal expert in Moroccan law (DOC). Perform a clause-by-clause audit of the following contract.
+
+## Contract
+{contract_text}
+
+## Legal References
+{relevant_laws}
+
+---
+
+# THE 7 RISK AXES
+
+For EACH clause, assess these 7 risks (HIGH/MODERATE/LOW/NONE):
+
+**1. VALIDITY** — Contrary to public order or mandatory rules? (DOC Art. 2, 62, 109, 230)
+Indicators: total exclusion of liability, waiver of mandatory rights
+
+**2. IMBALANCE** — Creates a significant imbalance between parties? (DOC Art. 231, 264)
+Indicators: unilateral termination, asymmetric penalties, unilateral modification
+
+**3. INCOMPLETENESS** — Necessary clause absent or insufficient?
+Check: force majeure, termination, disputes, confidentiality, liability cap
+
+**4. AMBIGUITY** — Vague or imprecise clause? (DOC Art. 461-473)
+Indicators: "reasonable time", undefined terms, unclear references
+
+**5. FINANCIAL EXPOSURE** — Excessive financial risk? (DOC Art. 263-264)
+Indicators: penalties without cap, unlimited indemnification, disproportionate amounts
+
+**6. APPLICABILITY** — Difficult to enforce in practice? (DOC Art. 259-260)
+Indicators: vague obligations, unrealistic deadlines, impossible proof
+
+**7. JURISDICTIONAL RISK** — Inappropriate forum or applicable law?
+Indicators: inaccessible foreign court, difficult enforcement in Morocco
+
+---
+
+# REPORT FORMAT
+Write in English:
+
+## EXECUTIVE SUMMARY
+- Overall Health: [CRITICAL/INSUFFICIENT/FAIR/GOOD/EXCELLENT]
+- Number of Clauses Analyzed
+- Top 3 Major Issues
+- Priority Actions
+
+## CLAUSE-BY-CLAUSE ANALYSIS
+
+### Clause [Number]: [Title]
+**Text:** [citation]
+**Type:** [TERMINATION/LIABILITY/PENALTIES/CONFIDENTIALITY/etc.]
+
+**Identified Risks:**
+| Axis | Level | Analysis | Legal Basis |
+|-----|--------|---------|---------------------|
+
+**Recommendations:** [corrective actions]
+**Human Review Required:** [YES/NO]
+[Repeat for each clause]
+
+## MISSING CLAUSES
+[List missing clauses that should be included]
+
+## PRIORITY RECOMMENDATIONS
+1. Immediate Actions (High Risks)
+2. Improvements (Moderate Risks)
+
+## CONCLUSION
+[Final Recommendation: sign/modify/negotiate/reject]
+
+---
+
+RULES:
+- High Risk → Human Review = YES
+- A clause can have multiple risks
+- Always cite the legal basis
+- When in doubt, escalate the risk
+
+Start the analysis.
+"""
+
 
 @dataclass
 class AuditFinding:
@@ -208,7 +290,7 @@ class AuditService:
         self.ollama_model = ollama_model
         self.ollama_base_url = ollama_base_url or os.getenv(
             "OLLAMA_BASE_URL", 
-            "http://localhost:11434"
+            "http://host.docker.internal:11434"
         )
         
         self.parser = ContractParser()
@@ -236,7 +318,7 @@ class AuditService:
             "options": {
                 "temperature": 0.3,
                 "top_p": 0.9,
-                "num_predict": 2048
+                "num_predict": 8192
             }
         }
         
@@ -491,7 +573,7 @@ class AuditService:
         laws_text = self.law_retriever.format_laws_for_prompt(relevant_laws)
         
         # Build prompt
-        prompt = QUICK_AUDIT_PROMPT.format(
+        prompt = CLAUSE_AUDIT_ENHANCED.format(
             contract_text=contract_text[:5000],  # Limit for prompt
             relevant_laws=laws_text
         )

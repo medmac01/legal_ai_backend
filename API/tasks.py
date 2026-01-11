@@ -200,8 +200,8 @@ def async_explain_contract(self, contract_text: str, question: str = None, confi
         
         if question:
             explanation_prompt.append(f"Answer the user's question as well: {question}")
-        else:
-            explanation_prompt.append("If no question is provided, give a concise explanation and practical takeaways.")
+        
+        explanation_prompt.append("Provide a concise explanation and practical takeaways even if no specific question is given.")
         
         composed_query = "\n".join(explanation_prompt) + f"\n\nContract text:\n{contract_text}"
         
@@ -214,11 +214,15 @@ def async_explain_contract(self, contract_text: str, question: str = None, confi
         
         result = asyncio.run(explain_async())
         
-        messages = result.get('response', {}).get('messages', []) if isinstance(result, dict) else []
         explanation = ""
-        if messages:
-            last_message = messages[-1]
-            explanation = getattr(last_message, 'content', "") or (last_message.get('content', "") if isinstance(last_message, dict) else str(last_message))
+        if isinstance(result, dict):
+            try:
+                explanation = result["response"]["messages"][-1].content
+            except Exception:
+                try:
+                    explanation = result.get("response", {}).get("messages", [])[-1].get("content", "")
+                except Exception:
+                    explanation = ""
         
         return create_task_response(
             status="SUCCESS",

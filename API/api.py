@@ -568,6 +568,66 @@ async def interrogation(
     )
     return create_response("Interrogation operation started", 202, {"task_id": task.id})
 
+class ExplainRequest(BaseModel):
+    """
+    Request model for explaining contract text or clauses.
+    """
+    contract_text: str
+    question: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    thread_id: Optional[str] = None
+
+@app.post("/explain", tags=["Contract Explanation"])
+async def explain_contract(
+    request: ExplainRequest,
+    user: Optional[SupabaseUser] = Depends(get_current_user)
+):
+    """
+    **Explain a contract or clause in friendly legal terms**
+
+    This endpoint accepts raw contract text (full contract or excerpt) and optionally
+    a user question. It delegates processing to a Celery task that uses the existing
+    agents to craft a clear, professional explanation and, when provided, answers
+    the user's question.
+
+    **Authentication:**
+    - Requires a valid Supabase JWT token in the Authorization header (if enabled)
+    - Format: `Authorization: Bearer <token>`
+
+    **Request Parameters:**
+    - `contract_text`: The contract text or clause to explain
+    - `question`: Optional user question about the provided text
+    - `config`: Optional configuration for the underlying model/agent
+    - `thread_id`: Optional thread ID to continue a prior explanation thread
+
+    **Response:**
+    - Returns a **task_id** that can be used to track the explanation operation.
+    """
+    user_info = f"{user.email} ({user.user_id})" if user else "anonymous (auth disabled)"
+    logger.info(f"Contract explanation request - User: {user_info}, Has question: {bool(request.question)}")
+    
+    if not request.contract_text.strip():
+        return create_response("Contract text is required", 400, {"error": "contract_text cannot be empty"})
+    
+    max_contract_length = 50000
+    if len(request.contract_text) > max_contract_length:
+        return create_response(
+            "Contract text too long",
+            400,
+            {"error": f"contract_text must be under {max_contract_length} characters"}
+        )
+    
+    try:
+        task = celery_app.send_task(
+            f'{Config.SERVICE_NAME}.tasks.explain_contract',
+            args=[request.contract_text, request.question, request.config, request.thread_id],
+            queue=Config.SERVICE_QUEUE
+        )
+        return create_response("Contract explanation started", 202, {"task_id": task.id})
+    except Exception as e:
+        logger.error(f"Failed to start contract explanation task: {str(e)}")
+        return create_response("Failed to start contract explanation", 500, {"error": str(e)})
+
 class IngestLawChunksRequest(BaseModel):
     """
     Request PAKTON to ingest pre-chunked law data into the vector database.

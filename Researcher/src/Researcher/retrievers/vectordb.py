@@ -57,14 +57,32 @@ class VectorDBRetriever(BaseRetriever):
 
             logger.info("Initializing VectorDBRetriever with vector store: %s", self.vector_store_type)
 
-            # Initialize OpenAI embeddings model
-            embedding_model = self.vectordb_config.get("embedding_model", "text-embedding-3-large")
-
-            embeddings_api_key = os.environ.get("EMBEDDINGS_API_KEY")
-            if not embeddings_api_key:
-                raise ValueError("EMBEDDINGS_API_KEY is required but not set in environment or config.")
-
-            self.embeddings = OpenAIEmbeddings(model=embedding_model, openai_api_key=embeddings_api_key)
+            # Initialize embedding model (supports API, local, and Ollama)
+            embedding_type = self.vectordb_config.get("embedding_type", "openai").lower()
+            
+            if embedding_type == "ollama":
+                # Use Ollama embeddings (local server) - use langchain_ollama for correct API endpoint
+                from langchain_ollama import OllamaEmbeddings
+                embedding_model = self.vectordb_config.get("embedding_model", "embeddinggemma:latest")
+                ollama_base_url = self.vectordb_config.get("ollama_base_url", "http://host.docker.internal:11434")
+                logger.info(f"Using Ollama embeddings: {embedding_model} at {ollama_base_url}")
+                self.embeddings = OllamaEmbeddings(
+                    model=embedding_model,
+                    base_url=ollama_base_url
+                )
+            elif embedding_type == "local":
+                # Use local HuggingFace embeddings (no API key needed)
+                from langchain_huggingface import HuggingFaceEmbeddings
+                embedding_model = self.vectordb_config.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
+                logger.info(f"Using local embeddings: {embedding_model}")
+                self.embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
+            else:
+                # Use OpenAI embeddings (requires API key)
+                embedding_model = self.vectordb_config.get("embedding_model", "text-embedding-3-large")
+                embeddings_api_key = os.environ.get("EMBEDDINGS_API_KEY")
+                if not embeddings_api_key:
+                    raise ValueError("EMBEDDINGS_API_KEY is required for OpenAI embeddings. Set embedding_type: 'ollama' or 'local' in config to use local embeddings instead.")
+                self.embeddings = OpenAIEmbeddings(model=embedding_model, openai_api_key=embeddings_api_key)
 
             self.top_k = self.vectordb_config.get("top_k", 5)
             self.similarity_threshold = self.vectordb_config.get("similarity_threshold", 0)
@@ -164,10 +182,21 @@ class VectorDBRetriever(BaseRetriever):
             retrieved_results = self.vectorstore.similarity_search_with_relevance_scores(query, k=top_k)
             documents = []
             for doc, score in retrieved_results:
-                if score <= similarity_threshold:
+                # Normalize relevance scores to [0, 1] if needed.
+                # Some backends (e.g., cosine similarity) can return in [-1, 1].
+                normalized_score = score
+                if normalized_score < 0 or normalized_score > 1:
+                    # Map cosine similarity [-1,1] -> [0,1]
+                    normalized_score = (normalized_score + 1) / 2
+                    # Clip to [0,1] to satisfy downstream consumers
+                    normalized_score = max(0.0, min(1.0, normalized_score))
+
+                # Apply threshold on normalized score
+                if normalized_score < similarity_threshold:
                     continue
+
                 doc.metadata["retriever"] = self.name
-                doc.metadata["vectordb_similarity_score"] = score  # Add similarity score to metadata
+                doc.metadata["vectordb_similarity_score"] = normalized_score
                 documents.append(doc)
 
             logger.info("Successfully retrieved %d documents from %s", len(documents), self.vector_store_type)

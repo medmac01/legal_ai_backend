@@ -42,8 +42,8 @@ class VectorDBIndexer(BaseIndexer):
             embedding_type = self.vectordb_config.get("embedding_type", "openai").lower()
             
             if embedding_type == "ollama":
-                # Use Ollama embeddings (local server)
-                from langchain_community.embeddings import OllamaEmbeddings
+                # Use Ollama embeddings (local server) - use langchain_ollama for correct API endpoint
+                from langchain_ollama import OllamaEmbeddings
                 embedding_model = self.vectordb_config.get("embedding_model", "embeddinggemma:latest")
                 ollama_base_url = self.vectordb_config.get("ollama_base_url", "http://host.docker.internal:11434")
                 logger.info(f"Using Ollama embeddings: {embedding_model} at {ollama_base_url}")
@@ -122,6 +122,29 @@ class VectorDBIndexer(BaseIndexer):
 
         logger.info("ChromaDB initialized with index: %s, persist_directory: %s", self.index_name, persist_directory)
 
+    def _filter_metadata(self, docs: List[Document]) -> List[Document]:
+        """
+        Filter out None and complex metadata values that ChromaDB cannot handle.
+        ChromaDB only accepts str, int, float, or bool metadata values.
+
+        Args:
+            docs (List[Document]): Documents to filter.
+
+        Returns:
+            List[Document]: Documents with cleaned metadata.
+        """
+        cleaned_docs = []
+        for doc in docs:
+            if doc.metadata:
+                # Filter metadata to only keep str, int, float, bool values
+                cleaned_metadata = {
+                    k: v for k, v in doc.metadata.items()
+                    if isinstance(v, (str, int, float, bool))
+                }
+                doc.metadata = cleaned_metadata
+            cleaned_docs.append(doc)
+        return cleaned_docs
+
     @property
     def name(self) -> str:
         """Return the unique name of this indexer."""
@@ -140,6 +163,10 @@ class VectorDBIndexer(BaseIndexer):
 
             # Delete all existing documents before indexing (For testing purposes)
             self.delete_all()
+
+            # Filter metadata for ChromaDB compatibility
+            if self.vector_store_type == "chroma":
+                docs = self._filter_metadata(docs)
 
             if self.vector_store_type == "pinecone":
                 # Convert docs to a PineconeVectorStore and upsert them
@@ -170,6 +197,10 @@ class VectorDBIndexer(BaseIndexer):
         """
         try:
             logger.info("Indexing %d documents into %s (without deleting existing)...", len(docs), self.vector_store_type)
+
+            # Filter metadata for ChromaDB compatibility
+            if self.vector_store_type == "chroma":
+                docs = self._filter_metadata(docs)
 
             if self.vector_store_type == "pinecone":
                 from langchain_pinecone import PineconeVectorStore

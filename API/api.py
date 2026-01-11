@@ -575,6 +575,7 @@ class ExplainRequest(BaseModel):
     contract_text: str
     question: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
+    thread_id: Optional[str] = None
 
 @app.post("/explain", tags=["Contract Explanation"])
 async def explain_contract(
@@ -597,6 +598,7 @@ async def explain_contract(
     - `contract_text`: The contract text or clause to explain
     - `question`: Optional user question about the provided text
     - `config`: Optional configuration for the underlying model/agent
+    - `thread_id`: Optional thread ID to continue a prior explanation thread
 
     **Response:**
     - Returns a **task_id** that can be used to track the explanation operation.
@@ -610,7 +612,7 @@ async def explain_contract(
     try:
         task = celery_app.send_task(
             f'{Config.SERVICE_NAME}.tasks.explain_contract',
-            args=[request.contract_text, request.question, request.config],
+            args=[request.contract_text, request.question, request.config, request.thread_id],
             queue=Config.SERVICE_QUEUE
         )
         return create_response("Contract explanation started", 202, {"task_id": task.id})

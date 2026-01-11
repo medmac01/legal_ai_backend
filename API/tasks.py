@@ -46,6 +46,17 @@ def get_archivist():
         logger.info("Archivist instance created")
     return archivist
 
+def _extract_last_message_content(messages):
+    """Safely extract the last message content from Archivist responses."""
+    if not messages:
+        return ""
+    last_message = messages[-1]
+    if hasattr(last_message, "content"):
+        return last_message.content
+    if isinstance(last_message, dict):
+        return last_message.get("content", "")
+    return str(last_message)
+
 @celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.interrogation', bind=True, default_retry_delay=5, max_retries=3)
 def async_interrogation(self, userQuery: str, userContext: str = "", userInstructions: str = ""):
     """Asynchronous interrogation for given query."""
@@ -165,7 +176,7 @@ def async_process_query(self, query: str, thread_id: str = None, config: dict = 
             message="Query processed successfully",
             data={
                 "thread_id": result['thread_id'],
-                "response_content": result['response']['messages'][-1].content,
+                "response_content": _extract_last_message_content(result['response']['messages']),
             }
         )
         
@@ -184,7 +195,7 @@ def async_process_query(self, query: str, thread_id: str = None, config: dict = 
         )
 
 @celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.explain_contract', bind=True, default_retry_delay=5, max_retries=3)
-def async_explain_contract(self, contract_text: str, question: str = None, config: dict = None):
+def async_explain_contract(self, contract_text: str, question: str = None, config: dict = None, thread_id: str = None):
     """
     Provide a friendly legal explanation for a contract (or clause) and optionally
     answer a user question about it.
@@ -210,28 +221,23 @@ def async_explain_contract(self, contract_text: str, question: str = None, confi
         
         async def explain_async():
             async with archivist:
-                return await archivist.process_query(composed_query, None, task_config)
+                return await archivist.process_query(composed_query, thread_id, task_config)
         
         result = asyncio.run(explain_async())
         
         explanation = ""
+        response_thread_id = thread_id
         if isinstance(result, dict):
             messages = result.get("response", {}).get("messages", [])
-            if messages:
-                last_message = messages[-1]
-                if hasattr(last_message, "content"):
-                    explanation = last_message.content
-                elif isinstance(last_message, dict):
-                    explanation = last_message.get("content", "")
-                else:
-                    explanation = str(last_message)
+            explanation = _extract_last_message_content(messages)
+            response_thread_id = result.get("thread_id", thread_id)
         
         return create_task_response(
             status="SUCCESS",
             task_id=self.request.id,
             message="Contract explanation completed",
             data={
-                "thread_id": result.get('thread_id') if isinstance(result, dict) else None,
+                "thread_id": response_thread_id,
                 "explanation": explanation
             }
         )

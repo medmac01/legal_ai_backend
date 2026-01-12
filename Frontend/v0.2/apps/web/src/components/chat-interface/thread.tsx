@@ -20,6 +20,10 @@ import { useThreadContext } from "@/contexts/ThreadProvider";
 import { useDocumentContext } from "@/contexts/DocumentContext";
 import { DocumentPreviewDialog } from "./document-preview-dialog";
 import { createSupabaseClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
+import { Input } from "../ui/input";
 
 const ThreadScrollToBottom: FC = () => {
   return (
@@ -71,6 +75,12 @@ export const Thread: FC<ThreadProps> = (props: ThreadProps) => {
   const { isDocumentUploaded, setIsDocumentUploaded, uploadedFileName, setUploadedFileName, uploadedFile, setUploadedFile } = useDocumentContext();
   const composerRuntime = useComposerRuntime();
   const uploadedFileRef = useRef<File | null>(null);
+  const [explainText, setExplainText] = useState("");
+  const [explainQuestion, setExplainQuestion] = useState("");
+  const [isExplainLoading, setIsExplainLoading] = useState(false);
+  const [explainResult, setExplainResult] = useState("");
+  const [auditReport, setAuditReport] = useState("");
+  const [auditLoading, setAuditLoading] = useState<"quick" | "full" | null>(null);
 
   // Effect to handle reattaching document after messages
   useEffect(() => {
@@ -111,6 +121,10 @@ export const Thread: FC<ThreadProps> = (props: ThreadProps) => {
     setIsDocumentUploaded(false);
     setUploadedFile(null);
     uploadedFileRef.current = null;
+    setExplainText("");
+    setExplainQuestion("");
+    setExplainResult("");
+    setAuditReport("");
   };
 
   const handleDocumentUpload = (event: any = null) => {
@@ -174,6 +188,230 @@ export const Thread: FC<ThreadProps> = (props: ThreadProps) => {
 
     throw new Error('Task polling timed out');
   };
+
+  const getAuthToken = async () => {
+    const supabase = createSupabaseClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  };
+
+  const handleExplainSubmit = async () => {
+    const trimmedText = explainText.trim();
+    if (!trimmedText) {
+      toast({
+        title: "Add text to explain",
+        description: "Paste contract text or a clause before requesting an explanation.",
+        duration: 4000,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExplainLoading(true);
+    setExplainResult("");
+
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required. Please log in again.");
+      }
+
+      const response = await fetch(`${ARCHIVIST_API_URL}/explain`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          contract_text: trimmedText,
+          question: explainQuestion.trim() || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Explain request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const taskId = result.data?.task_id;
+
+      if (!taskId) {
+        throw new Error("No task ID returned from server.");
+      }
+
+      const taskResult = await pollTaskStatus(taskId);
+      const taskResponse = taskResult.data?.task_response;
+      const explanation =
+        taskResponse?.data?.explanation ||
+        taskResponse?.data?.response_content ||
+        taskResponse?.message ||
+        "";
+
+      setExplainResult(explanation);
+      toast({
+        title: "Explanation ready",
+        description: "Your contract explanation has been generated.",
+        duration: 4000,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Explain request failed",
+        description: error?.message || "Unable to explain the provided text.",
+        duration: 5000,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExplainLoading(false);
+    }
+  };
+
+  const handleAudit = async (mode: "quick" | "full") => {
+    const fileToAudit = uploadedFile || uploadedFileRef.current;
+
+    if (!fileToAudit) {
+      toast({
+        title: "Upload required",
+        description: "Please upload a contract before running an audit.",
+        duration: 4000,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAuditLoading(mode);
+    setAuditReport("");
+
+    try {
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error("Authentication required. Please log in again.");
+      }
+
+      const endpoint = mode === "full" ? "/contract/audit" : "/contract/audit/quick";
+      const formData = new FormData();
+      formData.append("file", fileToAudit, fileToAudit.name);
+      if (mode === "full") {
+        formData.append("generate_summary", "true");
+      }
+
+      const response = await fetch(`${ARCHIVIST_API_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Audit request failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const taskId = result.data?.task_id;
+
+      if (!taskId) {
+        throw new Error("No task ID returned from server.");
+      }
+
+      const taskResult = await pollTaskStatus(taskId, mode === "full" ? 40 : 30);
+      const taskResponse = taskResult.data?.task_response;
+      const reportContent =
+        taskResponse?.data?.markdown_report ||
+        taskResponse?.data?.json_report ||
+        taskResponse?.data?.assessment ||
+        taskResponse?.message ||
+        "";
+
+      setAuditReport(typeof reportContent === "string" ? reportContent : JSON.stringify(reportContent, null, 2));
+
+      toast({
+        title: "Audit complete",
+        description: mode === "full" ? "Full audit report is ready." : "Quick audit report is ready.",
+        duration: 4000,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Audit request failed",
+        description: error?.message || "Unable to run the audit on this contract.",
+        duration: 5000,
+        variant: "destructive",
+      });
+    } finally {
+      setAuditLoading(null);
+    }
+  };
+
+  const renderExplainAuditPanel = () => (
+    <div className="mb-4 space-y-3 rounded-lg border border-neutral-200 bg-white/80 p-4 shadow-sm">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Explain contract text</p>
+            <Button
+              size="sm"
+              onClick={handleExplainSubmit}
+              disabled={isExplainLoading}
+            >
+              {isExplainLoading ? "Explaining..." : "Explain"}
+            </Button>
+          </div>
+          <Textarea
+            value={explainText}
+            onChange={(e) => setExplainText(e.target.value)}
+            placeholder="Paste a clause or contract text for a friendly explanation"
+            className="text-sm"
+            rows={5}
+          />
+          <Input
+            value={explainQuestion}
+            onChange={(e) => setExplainQuestion(e.target.value)}
+            placeholder="Optional question about the provided text"
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Audit uploaded contract</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleAudit("quick")}
+                disabled={auditLoading !== null}
+              >
+                {auditLoading === "quick" ? "Running..." : "Quick audit"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleAudit("full")}
+                disabled={auditLoading !== null}
+              >
+                {auditLoading === "full" ? "Running..." : "Full audit"}
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">
+            Use your uploaded contract to get a rapid assessment or a detailed audit against the backend service.
+          </p>
+          {!isDocumentUploaded && (
+            <p className="text-xs text-amber-600">
+              Upload a contract first to enable auditing.
+            </p>
+          )}
+        </div>
+      </div>
+      {explainResult && (
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 whitespace-pre-wrap">
+          {explainResult}
+        </div>
+      )}
+      {auditReport && (
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800 whitespace-pre-wrap">
+          {auditReport}
+        </div>
+      )}
+    </div>
+  );
 
   const processUploadedFile = async (file: File) => {
     const MIME_TYPES: Record<string, string> = {
@@ -338,6 +576,7 @@ export const Thread: FC<ThreadProps> = (props: ThreadProps) => {
                 handleDocumentUpload={handleDocumentUpload}
                 isDocumentUploaded={isDocumentUploaded}
               />
+              {renderExplainAuditPanel()}
             </motion.div>
           ) : (
             <motion.div
@@ -360,6 +599,7 @@ export const Thread: FC<ThreadProps> = (props: ThreadProps) => {
                   </DocumentPreviewDialog>
                 </div>
               )}
+              {renderExplainAuditPanel()}
               <ThreadPrimitive.Messages
                 components={{
                   UserMessage: UserMessage,

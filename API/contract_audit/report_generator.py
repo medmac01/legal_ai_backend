@@ -202,7 +202,8 @@ class ReportGenerator:
         """
         contract_name = quick_audit.get("contract_name", "Unknown Contract")
         audit_date = quick_audit.get("audit_date", datetime.now().isoformat())
-        assessment = quick_audit.get("assessment", "No assessment available")
+        raw_response = quick_audit.get("raw_response", "No assessment available")
+        parsed_assessment = quick_audit.get("parsed_assessment", {})
         text_length = quick_audit.get("text_length", 0)
         laws_count = quick_audit.get("relevant_laws_count", 0)
         error = quick_audit.get("error")
@@ -226,7 +227,7 @@ class ReportGenerator:
         
         lines.append("## Assessment")
         lines.append("")
-        lines.append(assessment)
+        lines.append(raw_response)
         lines.append("")
         
         lines.append("---")

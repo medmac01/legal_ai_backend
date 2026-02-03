@@ -195,11 +195,12 @@ def async_process_query(self, query: str, thread_id: str = None, config: dict = 
         )
 
 @celery_app.task(name=f'{Config.SERVICE_NAME}.tasks.explain_contract', bind=True, default_retry_delay=5, max_retries=3)
-def async_explain_contract(self, contract_text: str, question: str = None, config: dict = None, thread_id: str = None):
+def async_explain_contract(self, contract_text: str, question: str = None, config: dict = None, thread_id: str = None, language: str = "english"):
     """
     Provide a friendly legal explanation for a contract (or clause) and optionally
     answer a user question about it. Uses direct LLM invocation for one-shot generation
-    instead of agent iteration.
+    instead of agent iteration. The response will be provided in the specified language
+    (defaults to English).
     """
     logger.debug("Task started: async_explain_contract")
     
@@ -215,9 +216,9 @@ def async_explain_contract(self, contract_text: str, question: str = None, confi
         
         # Build system and human messages for direct LLM invocation
         system_prompt = (
-            "You are a professional contract lawyer. Explain contracts in clear, friendly language. "
-            "Highlight key obligations, rights, and any notable risks. Provide concise explanations "
-            "and practical takeaways."
+            f"You are a professional contract lawyer. Explain contracts in clear, friendly language. "
+            f"Highlight key obligations, rights, and any notable risks. Provide concise explanations "
+            f"and practical takeaways. IMPORTANT: Respond in {language.lower()}."
         )
         
         user_message_parts = [

@@ -576,6 +576,7 @@ class ExplainRequest(BaseModel):
     question: Optional[str] = None
     config: Optional[Dict[str, Any]] = None
     thread_id: Optional[str] = None
+    language: Optional[str] = None
 
 @app.post("/explain", tags=["Contract Explanation"])
 async def explain_contract(
@@ -599,6 +600,7 @@ async def explain_contract(
     - `question`: Optional user question about the provided text
     - `config`: Optional configuration for the underlying model/agent
     - `thread_id`: Optional thread ID to continue a prior explanation thread
+    - `language`: Optional language for the explanation response (defaults to English)
 
     **Response:**
     - Returns a **task_id** that can be used to track the explanation operation.
@@ -618,9 +620,12 @@ async def explain_contract(
         )
     
     try:
+        # Default to English if no language is specified
+        user_language = request.language if request.language else "english"
+        
         task = celery_app.send_task(
             f'{Config.SERVICE_NAME}.tasks.explain_contract',
-            args=[request.contract_text, request.question, request.config, request.thread_id],
+            args=[request.contract_text, request.question, request.config, request.thread_id, user_language],
             queue=Config.SERVICE_QUEUE
         )
         return create_response("Contract explanation started", 202, {"task_id": task.id})
